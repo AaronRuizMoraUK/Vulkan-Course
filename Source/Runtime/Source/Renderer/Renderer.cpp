@@ -2,6 +2,8 @@
 
 #include <Log/Log.h>
 
+#include <vulkan/vulkan.h>
+
 namespace DX
 {
     Renderer::Renderer(RendererId rendererId, Window* window)
@@ -23,6 +25,11 @@ namespace DX
         //}
 
         DX_LOG(Info, "Renderer", "Initializing Renderer...");
+
+        uint32_t extensionsCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionsCount, nullptr);
+
+        DX_LOG(Info, "Vulkan", "Number of extensions: %i", extensionsCount);
 
         return true;
     }

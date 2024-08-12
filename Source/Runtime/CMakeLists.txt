@@ -1,5 +1,8 @@
 ﻿cmake_minimum_required(VERSION 3.28)
 
+# Requires Vulkan 1.3 SDK to be installed. It can be downloaded from https://vulkan.lunarg.com/
+find_package(Vulkan 1.3 REQUIRED)
+
 file(GLOB_RECURSE RUNTIME_SOURCE_FILES
     "${CMAKE_SOURCE_DIR}/Source/Runtime/Source/*.*")
 
@@ -17,6 +20,7 @@ target_compile_definitions(Runtime PRIVATE STB_IMAGE_IMPLEMENTATION=1) # For stb
 
 # Libraries
 target_link_libraries(Runtime PUBLIC Core)
+target_link_libraries(Runtime PRIVATE Vulkan::Vulkan)
 target_link_libraries(Runtime PRIVATE glfw)
 target_link_libraries(Runtime PRIVATE stb)
 target_link_libraries(Runtime PRIVATE assimp)
