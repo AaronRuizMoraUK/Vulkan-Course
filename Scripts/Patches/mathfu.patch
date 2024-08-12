@@ -1,0 +1,35 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 04a29f1..1ff1051 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -11,7 +11,7 @@
+ # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ # See the License for the specific language governing permissions and
+ # limitations under the License.
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.5)
+ 
+ set(PROJECT_NAME MathFu)
+ project(MathFu)
+diff --git a/include/mathfu/vector.h b/include/mathfu/vector.h
+index 2ab357c..8d2df04 100644
+--- a/include/mathfu/vector.h
++++ b/include/mathfu/vector.h
+@@ -897,7 +897,7 @@ template <class T, int Dims>
+ inline Vector<T, Dims> MaxHelper(const Vector<T, Dims>& v1,
+                                  const Vector<T, Dims>& v2) {
+   Vector<T, Dims> result;
+-  MATHFU_VECTOR_OPERATION(result[i] = std::max(v1[i], v2[i]));
++  MATHFU_VECTOR_OPERATION(result[i] = std::max<T>(v1[i], v2[i]));
+   return result;
+ }
+ 
+@@ -910,7 +910,7 @@ template <class T, int Dims>
+ inline Vector<T, Dims> MinHelper(const Vector<T, Dims>& v1,
+                                  const Vector<T, Dims>& v2) {
+   Vector<T, Dims> result;
+-  MATHFU_VECTOR_OPERATION(result[i] = std::min(v1[i], v2[i]));
++  MATHFU_VECTOR_OPERATION(result[i] = std::min<T>(v1[i], v2[i]));
+   return result;
+ }
+ 
