@@ -7,6 +7,7 @@ Project generated while doing the Udemy course *[Learn the Vulkan API with C++](
 ## Build and Run
 
 Requirements
+- Vulkan SDK 1.3. Download installer from https://vulkan.lunarg.com/
 - Graphics card with Vulkan support
 - Microsoft Windows 
 - Microsoft Visual Studio 2022
