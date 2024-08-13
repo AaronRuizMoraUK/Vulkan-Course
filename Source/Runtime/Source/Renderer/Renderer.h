@@ -4,6 +4,7 @@
 #include <GenericId/GenericId.h>
 
 typedef struct VkInstance_T* VkInstance;
+typedef struct VkDebugUtilsMessengerEXT_T* VkDebugUtilsMessengerEXT;
 typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkDevice_T* VkDevice;
 typedef struct VkQueue_T* VkQueue;
@@ -61,6 +62,7 @@ namespace DX
             void Terminate();
         };
 
+        bool VkInstanceLayersSupported(const std::vector<const char*>& layers) const;
         bool VkInstanceExtensionsSupported(const std::vector<const char*>& extensions) const;
         bool CheckVkPhysicalDeviceSuitable(VkPhysicalDevice vkPhysicalDevice) const;
         VkQueueFamilyIndices EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice) const;
@@ -69,6 +71,7 @@ namespace DX
         bool CreateVkLogicalDevice();
 
         VkInstance m_vkInstance = nullptr;
+        VkDebugUtilsMessengerEXT m_vkDebugUtilsMessenger = nullptr;
         VkLogicalDevice m_vkLogicalDevice;
     };
 } // namespace DX

@@ -7,6 +7,85 @@
 #define GLFW_INCLUDE_VULKAN // This will cause glfw3.h to include vulkan.h already
 #include <GLFW/glfw3.h>
 
+// Helper for Vulkan Validation and log validation messages
+namespace VkValidation
+{
+#ifdef _DEBUG
+    static const bool DebugEnabled = true;
+#else
+    static const bool DebugEnabled = false;
+#endif
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+        [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT messageType,
+        const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
+        [[maybe_unused]] void* userData)
+    {
+        if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
+        {
+            DX_LOG(Verbose, "Vulkan", callbackData->pMessage);
+        }
+        else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+        {
+            DX_LOG(Info, "Vulkan", callbackData->pMessage);
+        }
+        else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+        {
+            DX_LOG(Warning, "Vulkan", callbackData->pMessage);
+        }
+        else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+        {
+            DX_LOG(Error, "Vulkan", callbackData->pMessage);
+        }
+
+        return VK_FALSE;
+    }
+
+    static VkResult CreateDebugUtilsMessengerEXT(
+        VkInstance instance,
+        const VkAllocationCallbacks* pAllocator,
+        VkDebugUtilsMessengerEXT* pDebugMessenger)
+    {
+        auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+        if (func != nullptr)
+        {
+            VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
+            debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+            debugCreateInfo.pNext = nullptr;
+            debugCreateInfo.flags = 0;
+            debugCreateInfo.messageSeverity =
+                VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+            debugCreateInfo.messageType =
+                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;;
+            debugCreateInfo.pfnUserCallback = DebugCallback;
+            debugCreateInfo.pUserData = nullptr;
+
+            return func(instance, &debugCreateInfo, pAllocator, pDebugMessenger);
+        }
+        else
+        {
+            return VK_ERROR_EXTENSION_NOT_PRESENT;
+        }
+    }
+
+    static void DestroyDebugUtilsMessengerEXT(
+        VkInstance instance,
+        VkDebugUtilsMessengerEXT debugMessenger,
+        const VkAllocationCallbacks* pAllocator)
+    {
+        auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+        if (func != nullptr)
+        {
+            func(instance, debugMessenger, pAllocator);
+        }
+    }
+}
+
 namespace DX
 {
     Renderer::Renderer(RendererId rendererId, Window* window)
@@ -51,6 +130,10 @@ namespace DX
         m_window->UnregisterWindowResizeEvent(m_windowResizeHandler);
 
         m_vkLogicalDevice.Terminate();
+
+        VkValidation::DestroyDebugUtilsMessengerEXT(m_vkInstance, m_vkDebugUtilsMessenger, nullptr);
+        m_vkDebugUtilsMessenger = nullptr;
+
         vkDestroyInstance(m_vkInstance, nullptr);
         m_vkInstance = nullptr;
     }
@@ -67,6 +150,32 @@ namespace DX
     Window* Renderer::GetWindow()
     {
         return m_window;
+    }
+
+    bool Renderer::VkInstanceLayersSupported(const std::vector<const char*>& layers) const
+    {
+        const std::vector<VkLayerProperties> layersProperties = []()
+            {
+                // Get number of Vulkan instance layers
+                uint32_t layerCount = 0;
+                vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+                // Get list of Vulkan instance layers supported
+                std::vector<VkLayerProperties> layersProperties(layerCount);
+                vkEnumerateInstanceLayerProperties(&layerCount, layersProperties.data());
+
+                return layersProperties;
+            }();
+
+        return std::all_of(layers.begin(), layers.end(),
+            [&layersProperties](const char* extension)
+            {
+                return std::find_if(layersProperties.begin(), layersProperties.end(),
+                    [extension](const VkLayerProperties& layerProperties)
+                    {
+                        return strcmp(layerProperties.layerName, extension) == 0;
+                    }) != layersProperties.end();
+            });
     }
 
     bool Renderer::VkInstanceExtensionsSupported(const std::vector<const char*>& extensions) const
@@ -129,7 +238,7 @@ namespace DX
         {
             if (vkQueueFamilyIndices.m_graphicsFamily < 0 &&
                 queueFamilyProperties[i].queueFlags & VK_QUEUE_GRAPHICS_BIT &&
-                queueFamilyProperties[i].queueCount > 0 )
+                queueFamilyProperties[i].queueCount > 0)
             {
                 vkQueueFamilyIndices.m_graphicsFamily = static_cast<int>(i);
             }
@@ -149,6 +258,21 @@ namespace DX
         vkAppInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         vkAppInfo.apiVersion = VK_API_VERSION_1_3; // Vulkan API version to be using.
 
+        // Vulkan instance layers
+        std::vector<const char*> vkInstanceLayers;
+        {
+            if (VkValidation::DebugEnabled)
+            {
+                // Enable Vulkan validation layers
+                vkInstanceLayers.push_back("VK_LAYER_KHRONOS_validation");
+            }
+        }
+        if (!VkInstanceLayersSupported(vkInstanceLayers))
+        {
+            DX_LOG(Error, "Renderer", "Vulkan instance layers used are not supported.");
+            return false;
+        }
+
         // Vulkan instance extensions
         std::vector<const char*> vkInstanceExtensions;
         {
@@ -156,24 +280,27 @@ namespace DX
             // Names returned are valid until GLFW is terminated.
             uint32_t glfwVkInstanceExtensionCount = 0;
             const char** glfwVkInstanceExtensions = glfwGetRequiredInstanceExtensions(&glfwVkInstanceExtensionCount);
-
             vkInstanceExtensions.assign(glfwVkInstanceExtensions, glfwVkInstanceExtensions + glfwVkInstanceExtensionCount);
+
+            if (VkValidation::DebugEnabled)
+            {
+                // Enable debug extension to be able to specify a callback to log validation errors
+                vkInstanceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            }
         }
         if (!VkInstanceExtensionsSupported(vkInstanceExtensions))
         {
-            DX_LOG(Error, "Renderer", "Vulkan instance extensions are not supported.");
+            DX_LOG(Error, "Renderer", "Vulkan instance extensions used are not supported.");
             return false;
         }
-
-        // TODO: Setup Vulkan validation layers
 
         VkInstanceCreateInfo vkInstanceCreateInfo = {};
         vkInstanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         vkInstanceCreateInfo.pNext = nullptr;
         vkInstanceCreateInfo.flags = 0;
         vkInstanceCreateInfo.pApplicationInfo = &vkAppInfo;
-        vkInstanceCreateInfo.enabledLayerCount = 0;
-        vkInstanceCreateInfo.ppEnabledLayerNames = nullptr;
+        vkInstanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(vkInstanceLayers.size());
+        vkInstanceCreateInfo.ppEnabledLayerNames = vkInstanceLayers.data();
         vkInstanceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(vkInstanceExtensions.size());
         vkInstanceCreateInfo.ppEnabledExtensionNames = vkInstanceExtensions.data();
 
@@ -181,6 +308,16 @@ namespace DX
         {
             DX_LOG(Error, "Renderer", "Failed to create Vulkan instance.");
             return false;
+        }
+
+        // Create debug utils messenger to set callback to print Vulkan validation messages
+        if (VkValidation::DebugEnabled)
+        {
+            if (VkValidation::CreateDebugUtilsMessengerEXT(m_vkInstance, nullptr, &m_vkDebugUtilsMessenger) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Renderer", "Failed to create Vulkan debug utils messenger.");
+                return false;
+            }
         }
 
         return true;
@@ -207,7 +344,7 @@ namespace DX
         }
 
         // Use first suitable Vulkan physical device
-        auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(), 
+        auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
             [this](VkPhysicalDevice physicalDevice)
             {
                 return CheckVkPhysicalDeviceSuitable(physicalDevice);
@@ -262,9 +399,9 @@ namespace DX
         }
 
         // Obtained the queues that have been created as part of the device.
-        vkGetDeviceQueue(m_vkLogicalDevice.m_vkDevice, 
-            m_vkLogicalDevice.m_vkQueueFamilyIndices.m_graphicsFamily, 
-            0, 
+        vkGetDeviceQueue(m_vkLogicalDevice.m_vkDevice,
+            m_vkLogicalDevice.m_vkQueueFamilyIndices.m_graphicsFamily,
+            0,
             &m_vkLogicalDevice.m_vkGraphicsQueue);
         if (!m_vkLogicalDevice.m_vkGraphicsQueue)
         {
