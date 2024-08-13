@@ -24,22 +24,42 @@ namespace VkValidation
     {
         if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
         {
-            DX_LOG(Verbose, "Vulkan", callbackData->pMessage);
+            DX_LOG(Verbose, "Vulkan Debug", callbackData->pMessage);
         }
         else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
         {
-            DX_LOG(Info, "Vulkan", callbackData->pMessage);
+            DX_LOG(Info, "Vulkan Debug", callbackData->pMessage);
         }
         else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
         {
-            DX_LOG(Warning, "Vulkan", callbackData->pMessage);
+            DX_LOG(Warning, "Vulkan Debug", callbackData->pMessage);
         }
         else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
         {
-            DX_LOG(Error, "Vulkan", callbackData->pMessage);
+            DX_LOG(Error, "Vulkan Debug", callbackData->pMessage);
         }
 
         return VK_FALSE;
+    }
+
+    static VkDebugUtilsMessengerCreateInfoEXT DebugUtilsMessengerCreateInfo()
+    {
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
+        debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        debugCreateInfo.pNext = nullptr;
+        debugCreateInfo.flags = 0;
+        debugCreateInfo.messageSeverity =
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        debugCreateInfo.messageType =
+            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;;
+        debugCreateInfo.pfnUserCallback = DebugCallback;
+        debugCreateInfo.pUserData = nullptr;
+
+        return debugCreateInfo;
     }
 
     static VkResult CreateDebugUtilsMessengerEXT(
@@ -50,20 +70,7 @@ namespace VkValidation
         auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
         if (func != nullptr)
         {
-            VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
-            debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            debugCreateInfo.pNext = nullptr;
-            debugCreateInfo.flags = 0;
-            debugCreateInfo.messageSeverity =
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-            debugCreateInfo.messageType =
-                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;;
-            debugCreateInfo.pfnUserCallback = DebugCallback;
-            debugCreateInfo.pUserData = nullptr;
+            const VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = DebugUtilsMessengerCreateInfo();
 
             return func(instance, &debugCreateInfo, pAllocator, pDebugMessenger);
         }
@@ -167,6 +174,12 @@ namespace DX
                 return layersProperties;
             }();
 
+        DX_LOG(Verbose, "Renderer", "Vulkan instance layers supported: %d", layersProperties.size());
+        for (const auto& layerProperties : layersProperties)
+        {
+            DX_LOG(Verbose, "Renderer", "\t- %s", layerProperties.layerName);
+        }
+
         return std::all_of(layers.begin(), layers.end(),
             [&layersProperties](const char* extension)
             {
@@ -192,6 +205,12 @@ namespace DX
 
                 return extensionsProperties;
             }();
+
+        DX_LOG(Verbose, "Renderer", "Vulkan instance extensions supported: %d", extensionsProperties.size());
+        for (const auto& extensionProperties : extensionsProperties)
+        {
+            DX_LOG(Verbose, "Renderer", "\t- %s", extensionProperties.extensionName);
+        }
 
         return std::all_of(extensions.begin(), extensions.end(),
             [&extensionsProperties](const char* extension)
@@ -272,6 +291,11 @@ namespace DX
             DX_LOG(Error, "Renderer", "Vulkan instance layers used are not supported.");
             return false;
         }
+        DX_LOG(Verbose, "Renderer", "Vulkan instance layers enabled: %d", vkInstanceLayers.size());
+        for (const auto& vkInstanceLayer : vkInstanceLayers)
+        {
+            DX_LOG(Verbose, "Renderer", "\t- %s", vkInstanceLayer);
+        }
 
         // Vulkan instance extensions
         std::vector<const char*> vkInstanceExtensions;
@@ -293,10 +317,27 @@ namespace DX
             DX_LOG(Error, "Renderer", "Vulkan instance extensions used are not supported.");
             return false;
         }
+        DX_LOG(Verbose, "Renderer", "Vulkan instance extensions enabled: %d", vkInstanceExtensions.size());
+        for (const auto& vkInstanceExtension : vkInstanceExtensions)
+        {
+            DX_LOG(Verbose, "Renderer", "\t- %s", vkInstanceExtension);
+        }
+
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo; // Here to ensure it is not destroyed before vkCreateInstance call
 
         VkInstanceCreateInfo vkInstanceCreateInfo = {};
         vkInstanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        vkInstanceCreateInfo.pNext = nullptr;
+        if (VkValidation::DebugEnabled)
+        {
+            // Include debug create info here so it also logs validation messages
+            // for vkCreateInstance and vkDestroyInstance functions.
+            debugCreateInfo = VkValidation::DebugUtilsMessengerCreateInfo();
+            vkInstanceCreateInfo.pNext = &debugCreateInfo;
+        }
+        else
+        {
+            vkInstanceCreateInfo.pNext = nullptr;
+        }
         vkInstanceCreateInfo.flags = 0;
         vkInstanceCreateInfo.pApplicationInfo = &vkAppInfo;
         vkInstanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(vkInstanceLayers.size());
@@ -342,6 +383,13 @@ namespace DX
             DX_LOG(Error, "Renderer", "No physical devices found that support Vulkan instance.");
             return false;
         }
+        DX_LOG(Verbose, "Renderer", "Physical Devices found: %d", physicalDevices.size());
+        for (const auto& physicalDevice : physicalDevices)
+        {
+            VkPhysicalDeviceProperties physicalDeviceProperties;
+            vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+            DX_LOG(Verbose, "Renderer", "\t- %s", physicalDeviceProperties.deviceName);
+        }
 
         // Use first suitable Vulkan physical device
         auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
@@ -354,6 +402,10 @@ namespace DX
             m_vkLogicalDevice.m_vkPhysicalDevice = *physicalDeviceIt;
             m_vkLogicalDevice.m_vkQueueFamilyIndices = EnumerateVkQueueFamilies(m_vkLogicalDevice.m_vkPhysicalDevice);
             DX_ASSERT(m_vkLogicalDevice.m_vkQueueFamilyIndices.IsValid(), "Renderer", "Queue Family Indices is not valid");
+
+            VkPhysicalDeviceProperties physicalDeviceProperties;
+            vkGetPhysicalDeviceProperties(m_vkLogicalDevice.m_vkPhysicalDevice, &physicalDeviceProperties);
+            DX_LOG(Verbose, "Renderer", "Physical Device used: %s", physicalDeviceProperties.deviceName);
         }
         else
         {
