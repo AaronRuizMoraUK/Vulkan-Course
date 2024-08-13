@@ -35,7 +35,8 @@ namespace DX
         }
 
         // Window is resizable if it's not full screen
-        const bool resizeable = !m_fullScreen;
+        // TODO: Not resizable yet to make it simpler.
+        const bool resizeable = false; //!m_fullScreen;
 
         // Do not use any client API
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
