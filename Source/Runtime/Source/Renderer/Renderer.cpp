@@ -450,7 +450,7 @@ namespace DX
             return false;
         }
 
-        // Obtained the queues that have been created as part of the device.
+        // Obtain the queues that have been created as part of the device.
         vkGetDeviceQueue(m_vkLogicalDevice.m_vkDevice,
             m_vkLogicalDevice.m_vkQueueFamilyIndices.m_graphicsFamily,
             0,
