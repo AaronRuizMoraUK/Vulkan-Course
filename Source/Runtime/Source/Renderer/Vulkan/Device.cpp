@@ -13,33 +13,18 @@
 
 namespace Vulkan
 {
+    bool VkQueueFamilyInfo::IsValid() const
+    {
+        return std::all_of(m_familyTypeToFamilyIndices.begin(), m_familyTypeToFamilyIndices.end(),
+            [](int index)
+            {
+                return index >= 0;
+            });
+    }
+
     // Utils to extract information and perform checks on Vulkan Physical Devices
     namespace Utils
     {
-        struct VkQueueFamilyInfo
-        {
-            // Maps family type to Vulkan queue family index (in the physical device)
-            // Different family types might use the same queue family index.
-            // Useful to query which is the family index of a type.
-            std::array<int, VkQueueFamilyType_Count> m_familyTypeToFamilyIndices;
-
-            VkQueueFamilyInfo()
-            {
-                // Start with invalid indices
-                m_familyTypeToFamilyIndices.fill(-1);
-            }
-
-            // Check if all families have been found
-            bool IsValid() const
-            {
-                return std::all_of(m_familyTypeToFamilyIndices.begin(), m_familyTypeToFamilyIndices.end(),
-                    [](int index)
-                    {
-                        return index >= 0;
-                    });
-            }
-        };
-
         VkQueueFamilyInfo EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
         {
             // Queue family properties of a Vulkan physical devices
@@ -206,6 +191,7 @@ namespace Vulkan
 
         vkDestroyDevice(m_vkDevice, nullptr);
         m_vkDevice = nullptr;
+        m_vkQueueFamilyInfo = VkQueueFamilyInfo();
         m_vkQueues.fill(nullptr);
         m_vkPhysicalDevice = nullptr;
     }
@@ -223,6 +209,11 @@ namespace Vulkan
     VkSurfaceKHR Device::GetVkSurface()
     {
         return m_vkSurface;
+    }
+
+    const VkQueueFamilyInfo& Device::GetVkQueueFamilyInfo() const
+    {
+        return m_vkQueueFamilyInfo;
     }
 
     bool Device::CreateVkDevice()
@@ -286,30 +277,21 @@ namespace Vulkan
         }
 
         // Queue Family information of the physical device.
-        const Utils::VkQueueFamilyInfo vkQueueFamilyInfo = Utils::EnumerateVkQueueFamilies(m_vkPhysicalDevice, m_vkSurface);
-        DX_ASSERT(vkQueueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
+        m_vkQueueFamilyInfo = Utils::EnumerateVkQueueFamilies(m_vkPhysicalDevice, m_vkSurface);
+        DX_ASSERT(m_vkQueueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
 
         const float queuePriority = 1.0f; // 1.0f is highest priority, 0.0f is lowest priority.
 
         // Populate the queues to create in the Vulkan device.
         std::vector<VkDeviceQueueCreateInfo> deviceQueuesCreateInfo;
         {
-            deviceQueuesCreateInfo.reserve(VkQueueFamilyType_Count);
+            const std::unordered_set<uint32_t> uniqueFamilyIndices(
+                m_vkQueueFamilyInfo.m_familyTypeToFamilyIndices.begin(), 
+                m_vkQueueFamilyInfo.m_familyTypeToFamilyIndices.end());
 
-            std::unordered_set<int> familyIndicesFound; // To keep track of new family indices inside the loop
-            for (int familyTypeIndex = 0; familyTypeIndex < VkQueueFamilyType_Count; ++familyTypeIndex)
+            deviceQueuesCreateInfo.reserve(uniqueFamilyIndices.size());
+            for (const uint32_t familyIndex : uniqueFamilyIndices)
             {
-                const int familyIndex = vkQueueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex];
-
-                // If this family index has already appeared, skip creation.
-                if (familyIndicesFound.find(familyIndex) != familyIndicesFound.end())
-                {
-                    continue;
-                }
-
-                // New family index.
-                familyIndicesFound.insert(familyIndex);
-
                 // Create a new queue for this family index.
                 VkDeviceQueueCreateInfo vkDeviceGraphicsQueueCreateInfo = {};
                 vkDeviceGraphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -321,8 +303,6 @@ namespace Vulkan
 
                 deviceQueuesCreateInfo.push_back(vkDeviceGraphicsQueueCreateInfo);
             }
-
-            deviceQueuesCreateInfo.shrink_to_fit();
         }
 
         // Physical device features that the logical device will be using
@@ -351,7 +331,7 @@ namespace Vulkan
         {
             vkGetDeviceQueue(
                 m_vkDevice, 
-                vkQueueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex], 
+                m_vkQueueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex],
                 0, 
                 &m_vkQueues[familyTypeIndex]);
             if (!m_vkQueues[familyTypeIndex])

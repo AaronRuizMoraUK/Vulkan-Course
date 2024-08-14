@@ -20,6 +20,23 @@ namespace Vulkan
         VkQueueFamilyType_Count,
     };
 
+    // Maps family type to Vulkan queue family index (in the physical device)
+    // Different family types might use the same queue family index.
+    // Useful to query which is the family index of a type.
+    struct VkQueueFamilyInfo
+    {
+        std::array<int, VkQueueFamilyType_Count> m_familyTypeToFamilyIndices;
+
+        VkQueueFamilyInfo()
+        {
+            // Start with invalid indices
+            m_familyTypeToFamilyIndices.fill(-1);
+        }
+
+        // Check if all families have been found
+        bool IsValid() const;
+    };
+
     // Manages the Vulkan physical device, logical device and queues.
     class Device
     {
@@ -37,6 +54,8 @@ namespace Vulkan
         VkPhysicalDevice GetVkPhysicalDevice();
         VkSurfaceKHR GetVkSurface();
 
+        const VkQueueFamilyInfo& GetVkQueueFamilyInfo() const;
+
     private:
         Instance* m_instance = nullptr;
         VkSurfaceKHR m_vkSurface = nullptr;
@@ -45,6 +64,7 @@ namespace Vulkan
         bool CreateVkDevice();
 
         VkPhysicalDevice m_vkPhysicalDevice = nullptr;
+        VkQueueFamilyInfo m_vkQueueFamilyInfo;
         VkDevice m_vkDevice = nullptr;
         std::array<VkQueue, VkQueueFamilyType_Count> m_vkQueues;
     };

@@ -121,7 +121,11 @@ namespace DX
 
     bool Renderer::CreateSwapChain()
     {
-        m_swapChain = std::make_unique<Vulkan::SwapChain>(m_device.get());
+        // Get frame buffer size in pixels from GLWF
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(m_window->GetWindowHandler(), &width, &height);
+
+        m_swapChain = std::make_unique<Vulkan::SwapChain>(m_device.get(), Math::Vector2Int(width, height));
 
         if (!m_swapChain->Initialize())
         {
