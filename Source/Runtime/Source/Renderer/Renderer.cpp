@@ -2,6 +2,7 @@
 
 #include <Renderer/Vulkan/Instance.h>
 #include <Renderer/Vulkan/Device.h>
+#include <Renderer/Vulkan/SwapChain.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -50,6 +51,12 @@ namespace DX
             return false;
         }
 
+        if (!CreateSwapChain())
+        {
+            Terminate();
+            return false;
+        }
+
         return true;
     }
 
@@ -59,6 +66,7 @@ namespace DX
 
         m_window->UnregisterWindowResizeEvent(m_windowResizeHandler);
 
+        m_swapChain.reset();
         m_device.reset();
         vkDestroySurfaceKHR((m_instance) ? m_instance->GetVkInstance() : nullptr, m_vkSurface, nullptr);
         m_vkSurface = nullptr;
@@ -105,6 +113,19 @@ namespace DX
         if (!m_device->Initialize())
         {
             DX_LOG(Error, "Renderer", "Failed to create device.");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Renderer::CreateSwapChain()
+    {
+        m_swapChain = std::make_unique<Vulkan::SwapChain>(m_device.get());
+
+        if (!m_swapChain->Initialize())
+        {
+            DX_LOG(Error, "Renderer", "Failed to create swap chain.");
             return false;
         }
 

@@ -9,6 +9,7 @@ namespace Vulkan
 {
     class Instance;
     class Device;
+    class SwapChain;
 }
 
 typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
@@ -46,9 +47,11 @@ namespace DX
         bool CreateInstance();
         bool CreateVkSurface();
         bool CreateDevice();
+        bool CreateSwapChain();
 
         std::unique_ptr<Vulkan::Instance> m_instance;
         VkSurfaceKHR m_vkSurface = nullptr;
         std::unique_ptr<Vulkan::Device> m_device;
+        std::unique_ptr<Vulkan::SwapChain> m_swapChain;
     };
 } // namespace DX

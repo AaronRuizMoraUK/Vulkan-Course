@@ -34,6 +34,8 @@ namespace Vulkan
         void Terminate();
 
         VkDevice GetVkDevice();
+        VkPhysicalDevice GetVkPhysicalDevice();
+        VkSurfaceKHR GetVkSurface();
 
     private:
         Instance* m_instance = nullptr;
