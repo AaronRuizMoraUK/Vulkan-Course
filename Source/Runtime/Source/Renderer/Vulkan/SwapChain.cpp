@@ -7,7 +7,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include <vector>
+#include <algorithm>
 #include <unordered_set>
 
 namespace Vulkan
@@ -157,6 +157,36 @@ namespace Vulkan
                 return vkSurfaceCapabilities.currentExtent;
             }
         }
+
+        bool CreateImageView(VkDevice vkDevice, VkImage vkImage, VkFormat vkFormat, VkImageAspectFlags vkAspectFlags, VkImageView* vkImageViewOut)
+        {
+            VkImageViewCreateInfo vkImageViewCreateInfo = {};
+            vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            vkImageViewCreateInfo.pNext = nullptr;
+            vkImageViewCreateInfo.flags = 0;
+            vkImageViewCreateInfo.image = vkImage;
+            vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            vkImageViewCreateInfo.format = vkFormat;
+            vkImageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            vkImageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            vkImageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            vkImageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+            // With subresource range it specifies the part of the image to view
+            vkImageViewCreateInfo.subresourceRange.aspectMask = vkAspectFlags;
+            vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
+            vkImageViewCreateInfo.subresourceRange.levelCount = 1;
+            vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+            vkImageViewCreateInfo.subresourceRange.layerCount = 1;
+
+            if (vkCreateImageView(vkDevice, &vkImageViewCreateInfo, nullptr, vkImageViewOut) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Vulkan SwapChain", "Failed to create Vulkan Image View.");
+                return false;
+            }
+
+            return true;
+        }
     }
 
     bool SwapChain::CheckSwapChainSupported(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
@@ -199,6 +229,13 @@ namespace Vulkan
     void SwapChain::Terminate()
     {
         DX_LOG(Info, "Vulkan SwapChain", "Terminating Vulkan SwapChain...");
+
+        std::for_each(m_swapChainImages.begin(), m_swapChainImages.end(),
+            [this](SwapChainImage& swapChainImage)
+            {
+                vkDestroyImageView(m_device->GetVkDevice(), swapChainImage.m_vkImageView, nullptr);
+            });
+        m_swapChainImages.clear();
 
         vkDestroySwapchainKHR(m_device->GetVkDevice(), m_vkSwapChain, nullptr);
         m_vkSwapChain = nullptr;
@@ -279,9 +316,61 @@ namespace Vulkan
             return false;
         }
 
-        // Cache recurrent swap chain properties
+        // Store recurrent swap chain properties
         m_imageFormat = vkSurfaceFormat.format;
         m_imageSize = Math::Vector2Int(vkImageExtent.width, vkImageExtent.height);
+
+        // Obtain the images that have been created as part of the swap chain.
+        // The vulkan images are obtained from the swap chain.
+        // The vulkan image views are created from the images.
+        m_swapChainImages = [this]()
+            {
+                uint32_t imageCount = 0;
+                vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &imageCount, nullptr);
+
+                std::vector<VkImage> vkSwapChainImages(imageCount);
+                vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &imageCount, vkSwapChainImages.data());
+
+                std::vector<VkImageView> vkSwapChainImageViews(imageCount);
+                std::transform(vkSwapChainImages.begin(), vkSwapChainImages.end(), vkSwapChainImageViews.begin(),
+                    [this](VkImage vkImage) -> VkImageView
+                    {
+                        if (VkImageView vkImageView = nullptr;
+                            Utils::CreateImageView(m_device->GetVkDevice(), vkImage, 
+                                static_cast<VkFormat>(m_imageFormat), VK_IMAGE_ASPECT_COLOR_BIT, &vkImageView))
+                        {
+                            return vkImageView;
+                        }
+                        else
+                        {
+                            return nullptr;
+                        }
+                    });
+
+                std::vector<SwapChainImage> swapChainImages(imageCount);
+                std::transform(vkSwapChainImages.begin(), vkSwapChainImages.end(), vkSwapChainImageViews.begin(), swapChainImages.begin(),
+                    [](VkImage vkImage, VkImageView vkImageView) -> SwapChainImage
+                    {
+                        return { vkImage, vkImageView };
+                    });
+
+                return swapChainImages;
+            }();
+
+        if (m_swapChainImages.empty())
+        {
+            DX_LOG(Error, "Vulkan SwapChain", "No Vulkan SwapChain Images created.");
+            return false;
+        }
+        else if (std::any_of(m_swapChainImages.begin(), m_swapChainImages.end(),
+            [](const SwapChainImage& swapChainImage)
+            {
+                return swapChainImage.m_vkImage == nullptr || swapChainImage.m_vkImageView == nullptr;
+            }))
+        {
+            DX_LOG(Error, "Vulkan SwapChain", "Failed to create Vulkan SwapChain Images.");
+            return false;
+        }
 
         return true;
     }
