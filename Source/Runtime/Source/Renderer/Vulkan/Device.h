@@ -40,23 +40,15 @@ namespace Vulkan
             }
         };
 
-        // All Vulkan information associated with a Vulkan logical device
-        struct VkLogicalDevice
-        {
-            VkPhysicalDevice m_vkPhysicalDevice = nullptr;
-            VkQueueFamilyIndices m_vkQueueFamilyIndices;
-            VkDevice m_vkDevice = nullptr;
-            VkQueue m_vkGraphicsQueue = nullptr;
-
-            void Terminate();
-        };
-
         bool CheckVkPhysicalDeviceSuitable(VkPhysicalDevice vkPhysicalDevice) const;
         VkQueueFamilyIndices EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice) const;
 
         bool CreateVkLogicalDevice();
 
         Instance* m_instance = nullptr;
-        VkLogicalDevice m_vkLogicalDevice;
+        VkPhysicalDevice m_vkPhysicalDevice = nullptr;
+        VkQueueFamilyIndices m_vkQueueFamilyIndices;
+        VkDevice m_vkDevice = nullptr;
+        VkQueue m_vkGraphicsQueue = nullptr;
     };
 } // namespace Vulkan

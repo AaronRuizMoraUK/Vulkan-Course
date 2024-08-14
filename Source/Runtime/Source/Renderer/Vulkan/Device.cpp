@@ -19,7 +19,7 @@ namespace Vulkan
 
     bool Device::Initialize()
     {
-        if (m_vkLogicalDevice.m_vkDevice)
+        if (m_vkDevice)
         {
             return true; // Already initialized
         }
@@ -39,21 +39,16 @@ namespace Vulkan
     {
         DX_LOG(Info, "Vulkan Device", "Terminating Vulkan Device...");
 
-        m_vkLogicalDevice.Terminate();
-    }
-
-    VkDevice Device::GetVkDevice()
-    {
-        return m_vkLogicalDevice.m_vkDevice;
-    }
-
-    void Device::VkLogicalDevice::Terminate()
-    {
         vkDestroyDevice(m_vkDevice, nullptr);
         m_vkDevice = nullptr;
         m_vkGraphicsQueue = nullptr;
         m_vkPhysicalDevice = nullptr;
         m_vkQueueFamilyIndices = VkQueueFamilyIndices();
+    }
+
+    VkDevice Device::GetVkDevice()
+    {
+        return m_vkDevice;
     }
 
     bool Device::CheckVkPhysicalDeviceSuitable(VkPhysicalDevice vkPhysicalDevice) const
@@ -115,15 +110,15 @@ namespace Vulkan
 
         if (physicalDevices.empty())
         {
-            DX_LOG(Error, "Renderer", "No physical devices found that support Vulkan instance.");
+            DX_LOG(Error, "Vulkan Device", "No physical devices found that support Vulkan instance.");
             return false;
         }
-        DX_LOG(Verbose, "Renderer", "Physical Devices found: %d", physicalDevices.size());
+        DX_LOG(Verbose, "Vulkan Device", "Physical Devices found: %d", physicalDevices.size());
         for (const auto& physicalDevice : physicalDevices)
         {
             VkPhysicalDeviceProperties physicalDeviceProperties;
             vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
-            DX_LOG(Verbose, "Renderer", "\t- %s", physicalDeviceProperties.deviceName);
+            DX_LOG(Verbose, "Vulkan Device", "\t- %s", physicalDeviceProperties.deviceName);
         }
 
         // Use first suitable Vulkan physical device
@@ -134,17 +129,17 @@ namespace Vulkan
             });
         if (physicalDeviceIt != physicalDevices.end())
         {
-            m_vkLogicalDevice.m_vkPhysicalDevice = *physicalDeviceIt;
-            m_vkLogicalDevice.m_vkQueueFamilyIndices = EnumerateVkQueueFamilies(m_vkLogicalDevice.m_vkPhysicalDevice);
-            DX_ASSERT(m_vkLogicalDevice.m_vkQueueFamilyIndices.IsValid(), "Renderer", "Queue Family Indices is not valid");
+            m_vkPhysicalDevice = *physicalDeviceIt;
+            m_vkQueueFamilyIndices = EnumerateVkQueueFamilies(m_vkPhysicalDevice);
+            DX_ASSERT(m_vkQueueFamilyIndices.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
 
             VkPhysicalDeviceProperties physicalDeviceProperties;
-            vkGetPhysicalDeviceProperties(m_vkLogicalDevice.m_vkPhysicalDevice, &physicalDeviceProperties);
-            DX_LOG(Verbose, "Renderer", "Physical Device used: %s", physicalDeviceProperties.deviceName);
+            vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, &physicalDeviceProperties);
+            DX_LOG(Verbose, "Vulkan Device", "Physical Device used: %s", physicalDeviceProperties.deviceName);
         }
         else
         {
-            DX_LOG(Error, "Renderer", "No suitable physical device found in Vulkan instance.");
+            DX_LOG(Error, "Vulkan Device", "No suitable physical device found in Vulkan instance.");
             return false;
         }
 
@@ -156,7 +151,7 @@ namespace Vulkan
         vkDeviceGraphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         vkDeviceGraphicsQueueCreateInfo.pNext = nullptr;
         vkDeviceGraphicsQueueCreateInfo.flags = 0;
-        vkDeviceGraphicsQueueCreateInfo.queueFamilyIndex = m_vkLogicalDevice.m_vkQueueFamilyIndices.m_graphicsFamily;
+        vkDeviceGraphicsQueueCreateInfo.queueFamilyIndex = m_vkQueueFamilyIndices.m_graphicsFamily;
         vkDeviceGraphicsQueueCreateInfo.queueCount = 1;
         vkDeviceGraphicsQueueCreateInfo.pQueuePriorities = &graphicsQueuePriority;
 
@@ -179,20 +174,17 @@ namespace Vulkan
         vkDeviceCreateInfo.ppEnabledExtensionNames = nullptr;
         vkDeviceCreateInfo.pEnabledFeatures = &vkPhysicalDeviceFeatures;
 
-        if (vkCreateDevice(m_vkLogicalDevice.m_vkPhysicalDevice, &vkDeviceCreateInfo, nullptr, &m_vkLogicalDevice.m_vkDevice) != VK_SUCCESS)
+        if (vkCreateDevice(m_vkPhysicalDevice, &vkDeviceCreateInfo, nullptr, &m_vkDevice) != VK_SUCCESS)
         {
-            DX_LOG(Error, "Renderer", "Failed to create Vulkan device.");
+            DX_LOG(Error, "Vulkan Device", "Failed to create Vulkan device.");
             return false;
         }
 
         // Obtain the queues that have been created as part of the device.
-        vkGetDeviceQueue(m_vkLogicalDevice.m_vkDevice,
-            m_vkLogicalDevice.m_vkQueueFamilyIndices.m_graphicsFamily,
-            0,
-            &m_vkLogicalDevice.m_vkGraphicsQueue);
-        if (!m_vkLogicalDevice.m_vkGraphicsQueue)
+        vkGetDeviceQueue(m_vkDevice, m_vkQueueFamilyIndices.m_graphicsFamily, 0, &m_vkGraphicsQueue);
+        if (!m_vkGraphicsQueue)
         {
-            DX_LOG(Error, "Renderer", "Failed to obtain graphics queue from Vulkan device.");
+            DX_LOG(Error, "Vulkan Device", "Failed to obtain graphics queue from Vulkan device.");
             return false;
         }
 

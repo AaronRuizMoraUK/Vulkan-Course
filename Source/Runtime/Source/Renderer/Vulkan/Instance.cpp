@@ -151,10 +151,10 @@ namespace Vulkan
                 return layersProperties;
             }();
 
-        DX_LOG(Verbose, "Renderer", "Vulkan instance layers supported: %d", layersProperties.size());
+        DX_LOG(Verbose, "Vulkan Instance", "Vulkan instance layers supported: %d", layersProperties.size());
         for (const auto& layerProperties : layersProperties)
         {
-            DX_LOG(Verbose, "Renderer", "\t- %s", layerProperties.layerName);
+            DX_LOG(Verbose, "Vulkan Instance", "\t- %s", layerProperties.layerName);
         }
 
         return std::all_of(layers.begin(), layers.end(),
@@ -183,10 +183,10 @@ namespace Vulkan
                 return extensionsProperties;
             }();
 
-        DX_LOG(Verbose, "Renderer", "Vulkan instance extensions supported: %d", extensionsProperties.size());
+        DX_LOG(Verbose, "Vulkan Instance", "Vulkan instance extensions supported: %d", extensionsProperties.size());
         for (const auto& extensionProperties : extensionsProperties)
         {
-            DX_LOG(Verbose, "Renderer", "\t- %s", extensionProperties.extensionName);
+            DX_LOG(Verbose, "Vulkan Instance", "\t- %s", extensionProperties.extensionName);
         }
 
         return std::all_of(extensions.begin(), extensions.end(),
@@ -222,13 +222,13 @@ namespace Vulkan
         }
         if (!VkInstanceLayersSupported(vkInstanceLayers))
         {
-            DX_LOG(Error, "Renderer", "Vulkan instance layers used are not supported.");
+            DX_LOG(Error, "Vulkan Instance", "Vulkan instance layers used are not supported.");
             return false;
         }
-        DX_LOG(Verbose, "Renderer", "Vulkan instance layers enabled: %d", vkInstanceLayers.size());
+        DX_LOG(Verbose, "Vulkan Instance", "Vulkan instance layers enabled: %d", vkInstanceLayers.size());
         for (const auto& vkInstanceLayer : vkInstanceLayers)
         {
-            DX_LOG(Verbose, "Renderer", "\t- %s", vkInstanceLayer);
+            DX_LOG(Verbose, "Vulkan Instance", "\t- %s", vkInstanceLayer);
         }
 
         // Vulkan instance extensions
@@ -248,13 +248,13 @@ namespace Vulkan
         }
         if (!VkInstanceExtensionsSupported(vkInstanceExtensions))
         {
-            DX_LOG(Error, "Renderer", "Vulkan instance extensions used are not supported.");
+            DX_LOG(Error, "Vulkan Instance", "Vulkan instance extensions used are not supported.");
             return false;
         }
-        DX_LOG(Verbose, "Renderer", "Vulkan instance extensions enabled: %d", vkInstanceExtensions.size());
+        DX_LOG(Verbose, "Vulkan Instance", "Vulkan instance extensions enabled: %d", vkInstanceExtensions.size());
         for (const auto& vkInstanceExtension : vkInstanceExtensions)
         {
-            DX_LOG(Verbose, "Renderer", "\t- %s", vkInstanceExtension);
+            DX_LOG(Verbose, "Vulkan Instance", "\t- %s", vkInstanceExtension);
         }
 
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo; // Here to ensure it is not destroyed before vkCreateInstance call
@@ -281,7 +281,7 @@ namespace Vulkan
 
         if (vkCreateInstance(&vkInstanceCreateInfo, nullptr, &m_vkInstance) != VK_SUCCESS)
         {
-            DX_LOG(Error, "Renderer", "Failed to create Vulkan instance.");
+            DX_LOG(Error, "Vulkan Instance", "Failed to create Vulkan instance.");
             return false;
         }
 
@@ -290,7 +290,7 @@ namespace Vulkan
         {
             if (VkValidation::CreateDebugUtilsMessengerEXT(m_vkInstance, nullptr, &m_vkDebugUtilsMessenger) != VK_SUCCESS)
             {
-                DX_LOG(Error, "Renderer", "Failed to create Vulkan debug utils messenger.");
+                DX_LOG(Error, "Vulkan Instance", "Failed to create Vulkan debug utils messenger.");
                 return false;
             }
         }
