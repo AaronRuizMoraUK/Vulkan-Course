@@ -2,8 +2,10 @@
 
 #include <Renderer/Vulkan/Instance.h>
 
+#include <array>
 #include <vector>
 
+typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
 typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkDevice_T* VkDevice;
 typedef struct VkQueue_T* VkQueue;
@@ -16,7 +18,7 @@ namespace Vulkan
     class Device
     {
     public:
-        Device(Instance* instance);
+        Device(Instance* instance, VkSurfaceKHR vkSurface);
         ~Device();
 
         Device(const Device&) = delete;
@@ -28,27 +30,44 @@ namespace Vulkan
         VkDevice GetVkDevice();
 
     private:
-        // Location of Queue Families in a Vulkan physical device
-        struct VkQueueFamilyIndices
-        {
-            int m_graphicsFamily = -1;
+        Instance* m_instance = nullptr;
+        VkSurfaceKHR m_vkSurface = nullptr;
 
-            // Check if all families have been found
-            bool IsValid() const
-            {
-                return m_graphicsFamily >= 0;
-            }
+        enum VkQueueFamilyType
+        {
+            VkQueueFamilyType_Graphics = 0,
+            VkQueueFamilyType_Compute,
+            VkQueueFamilyType_Presentation,
+
+            VkQueueFamilyType_Count,
         };
 
-        bool CheckVkPhysicalDeviceSuitable(VkPhysicalDevice vkPhysicalDevice) const;
-        VkQueueFamilyIndices EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice) const;
+        struct VkQueueFamilyInfo
+        {
+            // Maps family type to Vulkan queue family index (in the physical device)
+            // Different family types might use the same queue family index.
+            // Useful to query which is the family index of a type.
+            std::array<int, VkQueueFamilyType_Count> m_familyTypeToFamilyIndices;
+
+            VkQueueFamilyInfo()
+            {
+                // Start with invalid indices
+                m_familyTypeToFamilyIndices.fill(-1);
+            }
+
+            // Check if all families have been found
+            bool IsValid() const;
+        };
+
+        bool CheckVkPhysicalDeviceSuitable(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions) const;
+        bool VkDeviceExtensionsSupported(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions) const;
+        VkQueueFamilyInfo EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice) const;
 
         bool CreateVkLogicalDevice();
 
-        Instance* m_instance = nullptr;
         VkPhysicalDevice m_vkPhysicalDevice = nullptr;
-        VkQueueFamilyIndices m_vkQueueFamilyIndices;
+        VkQueueFamilyInfo m_vkQueueFamilyInfo;
         VkDevice m_vkDevice = nullptr;
-        VkQueue m_vkGraphicsQueue = nullptr;
+        std::array<VkQueue, VkQueueFamilyType_Count> m_vkQueues;
     };
 } // namespace Vulkan
