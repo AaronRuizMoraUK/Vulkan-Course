@@ -59,7 +59,7 @@ namespace Vulkan
             bool IsValid() const;
         };
 
-        bool CheckVkPhysicalDeviceSuitable(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions) const;
+        bool CheckVkPhysicalDeviceSuitable(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface, const std::vector<const char*>& extensions) const;
         bool VkDeviceExtensionsSupported(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions) const;
         VkQueueFamilyInfo EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice) const;
 

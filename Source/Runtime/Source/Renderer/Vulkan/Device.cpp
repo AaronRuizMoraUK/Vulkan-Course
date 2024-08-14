@@ -10,6 +10,65 @@
 
 namespace Vulkan
 {
+    struct VkSwapChainInfo
+    {
+        VkSurfaceCapabilitiesKHR m_vkSurfaceCapabilities;
+        std::vector<VkSurfaceFormatKHR> m_vkSupportedSurfaceFormats;
+        std::vector<VkPresentModeKHR> m_vkSupportedPresentModes;
+    };
+
+    static VkSwapChainInfo PopulateVkSwapChainInfo(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
+    {
+        VkSwapChainInfo vkSwapChainInfo;
+
+        // Surface Capabilities
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+            vkPhysicalDevice, vkSurface, &vkSwapChainInfo.m_vkSurfaceCapabilities);
+
+        // Surface Formats
+        vkSwapChainInfo.m_vkSupportedSurfaceFormats = [vkPhysicalDevice, vkSurface]()
+        {
+            uint32_t formatCount = 0;
+            vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, nullptr);
+
+            std::vector<VkSurfaceFormatKHR> vkSupportedSurfaceFormats(formatCount);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, vkSupportedSurfaceFormats.data());
+
+            return vkSupportedSurfaceFormats;
+        }();
+
+        // Presentation Modes
+        vkSwapChainInfo.m_vkSupportedPresentModes = [vkPhysicalDevice, vkSurface]()
+        {
+            uint32_t presentCount = 0;
+            vkGetPhysicalDeviceSurfacePresentModesKHR(vkPhysicalDevice, vkSurface, &presentCount, nullptr);
+
+            std::vector<VkPresentModeKHR> vkSupportedPresentModes(presentCount);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(vkPhysicalDevice, vkSurface, &presentCount, vkSupportedPresentModes.data());
+
+            return vkSupportedPresentModes;
+        }();
+
+        VkPhysicalDeviceProperties physicalDeviceProperties;
+        vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
+        DX_LOG(Verbose, "Vulkan Device", "Vulkan Swap Chain Info by '%s':", physicalDeviceProperties.deviceName);
+        DX_LOG(Verbose, "Vulkan Device", "\t- Min image Count: %d", vkSwapChainInfo.m_vkSurfaceCapabilities.minImageCount);
+        DX_LOG(Verbose, "Vulkan Device", "\t- Max image Count: %d", vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageCount);
+        DX_LOG(Verbose, "Vulkan Device", "\t- Current image size: %dx%d",
+            vkSwapChainInfo.m_vkSurfaceCapabilities.currentExtent.width,
+            vkSwapChainInfo.m_vkSurfaceCapabilities.currentExtent.height);
+        DX_LOG(Verbose, "Vulkan Device", "\t- Min image size: %dx%d",
+            vkSwapChainInfo.m_vkSurfaceCapabilities.minImageExtent.width, 
+            vkSwapChainInfo.m_vkSurfaceCapabilities.minImageExtent.height);
+        DX_LOG(Verbose, "Vulkan Device", "\t- Max image size: %dx%d",
+            vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageExtent.width,
+            vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageExtent.height);
+        DX_LOG(Verbose, "Vulkan Device", "\t- Surface formats: %d", vkSwapChainInfo.m_vkSupportedSurfaceFormats.size());
+        DX_LOG(Verbose, "Vulkan Device", "\t- Presentation modes: %d", vkSwapChainInfo.m_vkSupportedPresentModes.size());
+
+        return vkSwapChainInfo;
+    }
+
     Device::Device(Instance* instance, VkSurfaceKHR vkSurface)
         : m_instance(instance)
         , m_vkSurface(vkSurface)
@@ -65,7 +124,10 @@ namespace Vulkan
             });
     }
 
-    bool Device::CheckVkPhysicalDeviceSuitable(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions) const
+    bool Device::CheckVkPhysicalDeviceSuitable(
+        VkPhysicalDevice vkPhysicalDevice, 
+        VkSurfaceKHR vkSurface, 
+        const std::vector<const char*>& extensions) const
     {
         // Information about the device itself (ID, name, type, vendor, etc.)
         //VkPhysicalDeviceProperties vkPhysicalDeviceProperties;
@@ -75,13 +137,21 @@ namespace Vulkan
         //VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures;
         //vkGetPhysicalDeviceFeatures(vkPhysicalDevice, &vkPhysicalDeviceFeatures);
 
-        // Information about device extensions
+        // Check device extensions support
         if (!VkDeviceExtensionsSupported(vkPhysicalDevice, extensions))
         {
             return false;
         }
 
-        // Information about Queue Families
+        // Check Swap Chain support
+        const VkSwapChainInfo vkSwapChainInfo = PopulateVkSwapChainInfo(vkPhysicalDevice, vkSurface);
+        if (vkSwapChainInfo.m_vkSupportedSurfaceFormats.empty() ||
+            vkSwapChainInfo.m_vkSupportedPresentModes.empty())
+        {
+            return false;
+        }
+
+        // Check Queue Families support
         const VkQueueFamilyInfo vkQueueFamilyInfo = EnumerateVkQueueFamilies(vkPhysicalDevice);
 
         return vkQueueFamilyInfo.IsValid();
@@ -222,7 +292,7 @@ namespace Vulkan
         auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
             [this, &vkDeviceExtensions](VkPhysicalDevice physicalDevice)
             {
-                return CheckVkPhysicalDeviceSuitable(physicalDevice, vkDeviceExtensions);
+                return CheckVkPhysicalDeviceSuitable(physicalDevice, m_vkSurface, vkDeviceExtensions);
             });
         if (physicalDeviceIt != physicalDevices.end())
         {
