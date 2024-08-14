@@ -230,7 +230,7 @@ namespace Vulkan
             DX_LOG(Error, "Vulkan Instance", "Vulkan instance layers used are not supported.");
             return false;
         }
-        DX_LOG(Verbose, "Vulkan Instance", "Vulkan instance layers enabled: %d", vkInstanceLayers.size());
+        DX_LOG(Verbose, "Vulkan Instance", "Vulkan instance layers to enable: %d", vkInstanceLayers.size());
         for (const auto& vkInstanceLayer : vkInstanceLayers)
         {
             DX_LOG(Verbose, "Vulkan Instance", "\t- %s", vkInstanceLayer);
@@ -256,7 +256,7 @@ namespace Vulkan
             DX_LOG(Error, "Vulkan Instance", "Vulkan instance extensions used are not supported.");
             return false;
         }
-        DX_LOG(Verbose, "Vulkan Instance", "Vulkan instance extensions enabled: %d", vkInstanceExtensions.size());
+        DX_LOG(Verbose, "Vulkan Instance", "Vulkan instance extensions to enable: %d", vkInstanceExtensions.size());
         for (const auto& vkInstanceExtension : vkInstanceExtensions)
         {
             DX_LOG(Verbose, "Vulkan Instance", "\t- %s", vkInstanceExtension);

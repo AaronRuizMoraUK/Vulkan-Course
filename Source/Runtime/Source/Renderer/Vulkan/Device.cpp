@@ -277,70 +277,75 @@ namespace Vulkan
 
     bool Device::CreateVkDevice()
     {
-        // Physical devices that the Vulkan instance can access
-        const std::vector<VkPhysicalDevice> physicalDevices = [this]()
-            {
-                uint32_t physicalDeviceCount = 0;
-                vkEnumeratePhysicalDevices(m_instance->GetVkInstance(), &physicalDeviceCount, nullptr);
-
-                std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
-                vkEnumeratePhysicalDevices(m_instance->GetVkInstance(), &physicalDeviceCount, physicalDevices.data());
-
-                return physicalDevices;
-            }();
-
-        if (physicalDevices.empty())
-        {
-            DX_LOG(Error, "Vulkan Device", "No physical devices found that support Vulkan instance.");
-            return false;
-        }
-        DX_LOG(Verbose, "Vulkan Device", "Physical Devices found: %d", physicalDevices.size());
-        for (const auto& physicalDevice : physicalDevices)
-        {
-            VkPhysicalDeviceProperties physicalDeviceProperties;
-            vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
-            DX_LOG(Verbose, "Vulkan Device", "\t- %s", physicalDeviceProperties.deviceName);
-        }
-
         // Vulkan device extensions that physical device must support
         const std::vector<const char*> vkDeviceExtensions =
         {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME
         };
 
-        // Use first suitable Vulkan physical device
-        auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
-            [this, &vkDeviceExtensions](VkPhysicalDevice physicalDevice)
+        // Physical Device
+        {
+            // Physical devices that the Vulkan instance can access
+            const std::vector<VkPhysicalDevice> physicalDevices = [this]()
+                {
+                    uint32_t physicalDeviceCount = 0;
+                    vkEnumeratePhysicalDevices(m_instance->GetVkInstance(), &physicalDeviceCount, nullptr);
+
+                    std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
+                    vkEnumeratePhysicalDevices(m_instance->GetVkInstance(), &physicalDeviceCount, physicalDevices.data());
+
+                    return physicalDevices;
+                }();
+
+            if (physicalDevices.empty())
             {
-                return Utils::CheckVkPhysicalDeviceSuitable(physicalDevice, m_vkSurface, vkDeviceExtensions);
-            });
-        if (physicalDeviceIt == physicalDevices.end())
-        {
-            DX_LOG(Error, "Vulkan Device", "No suitable physical device found in Vulkan instance.");
-            return false;
+                DX_LOG(Error, "Vulkan Device", "No physical devices found that support Vulkan instance.");
+                return false;
+            }
+            DX_LOG(Verbose, "Vulkan Device", "Physical Devices found: %d", physicalDevices.size());
+            for (const auto& physicalDevice : physicalDevices)
+            {
+                VkPhysicalDeviceProperties physicalDeviceProperties;
+                vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+                DX_LOG(Verbose, "Vulkan Device", "\t- %s", physicalDeviceProperties.deviceName);
+            }
+
+            // Use first suitable Vulkan physical device
+            auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
+                [this, &vkDeviceExtensions](VkPhysicalDevice physicalDevice)
+                {
+                    return Utils::CheckVkPhysicalDeviceSuitable(physicalDevice, m_vkSurface, vkDeviceExtensions);
+                });
+            if (physicalDeviceIt == physicalDevices.end())
+            {
+                DX_LOG(Error, "Vulkan Device", "No suitable physical device found in Vulkan instance.");
+                return false;
+            }
+
+            m_vkPhysicalDevice = *physicalDeviceIt;
+
+            VkPhysicalDeviceProperties physicalDeviceProperties;
+            vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, &physicalDeviceProperties);
+            DX_LOG(Verbose, "Vulkan Device", "Physical Device used: %s", physicalDeviceProperties.deviceName);
+
+            DX_LOG(Verbose, "Vulkan Device", "Vulkan device extensions to enable: %d", vkDeviceExtensions.size());
+            for (const auto& vkDeviceExtension : vkDeviceExtensions)
+            {
+                DX_LOG(Verbose, "Vulkan Device", "\t- %s", vkDeviceExtension);
+            }
         }
 
-        m_vkPhysicalDevice = *physicalDeviceIt;
-
-        const Utils::VkQueueFamilyInfo  vkQueueFamilyInfo = Utils::EnumerateVkQueueFamilies(m_vkPhysicalDevice, m_vkSurface);
+        // Queue Family information of the physical device.
+        const Utils::VkQueueFamilyInfo vkQueueFamilyInfo = Utils::EnumerateVkQueueFamilies(m_vkPhysicalDevice, m_vkSurface);
         DX_ASSERT(vkQueueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
-
-        VkPhysicalDeviceProperties physicalDeviceProperties;
-        vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, &physicalDeviceProperties);
-        DX_LOG(Verbose, "Vulkan Device", "Physical Device used: %s", physicalDeviceProperties.deviceName);
-
-        DX_LOG(Verbose, "Vulkan Device", "Vulkan device extensions enabled: %d", vkDeviceExtensions.size());
-        for (const auto& vkDeviceExtension : vkDeviceExtensions)
-        {
-            DX_LOG(Verbose, "Vulkan Device", "\t- %s", vkDeviceExtension);
-        }
 
         const float queuePriority = 1.0f; // 1.0f is highest priority, 0.0f is lowest priority.
 
         // Populate the queues to create in the Vulkan device.
         std::vector<VkDeviceQueueCreateInfo> deviceQueuesCreateInfo;
-        deviceQueuesCreateInfo.reserve(VkQueueFamilyType_Count);
         {
+            deviceQueuesCreateInfo.reserve(VkQueueFamilyType_Count);
+
             std::unordered_set<int> familyIndicesFound; // To keep track of new family indices inside the loop
             for (int familyTypeIndex = 0; familyTypeIndex < VkQueueFamilyType_Count; ++familyTypeIndex)
             {
@@ -366,6 +371,7 @@ namespace Vulkan
 
                 deviceQueuesCreateInfo.push_back(vkDeviceGraphicsQueueCreateInfo);
             }
+
             deviceQueuesCreateInfo.shrink_to_fit();
         }
 
