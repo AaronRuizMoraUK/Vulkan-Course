@@ -12,7 +12,7 @@ namespace Vulkan
 {
     struct VkSwapChainInfo
     {
-        VkSurfaceCapabilitiesKHR m_vkSurfaceCapabilities;
+        VkSurfaceCapabilitiesKHR m_vkSurfaceCapabilities = {};
         std::vector<VkSurfaceFormatKHR> m_vkSupportedSurfaceFormats;
         std::vector<VkPresentModeKHR> m_vkSupportedPresentModes;
     };
