@@ -1,5 +1,7 @@
 #include <Renderer/Vulkan/Device.h>
 
+#include <Renderer/Vulkan/Instance.h>
+
 #include <Log/Log.h>
 #include <Debug/Debug.h>
 
@@ -10,63 +12,222 @@
 
 namespace Vulkan
 {
-    struct VkSwapChainInfo
+    // Utils to extract information and perform checks on Vulkan Physical Devices
+    namespace Utils
     {
-        VkSurfaceCapabilitiesKHR m_vkSurfaceCapabilities = {};
-        std::vector<VkSurfaceFormatKHR> m_vkSupportedSurfaceFormats;
-        std::vector<VkPresentModeKHR> m_vkSupportedPresentModes;
-    };
-
-    static VkSwapChainInfo PopulateVkSwapChainInfo(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
-    {
-        VkSwapChainInfo vkSwapChainInfo;
-
-        // Surface Capabilities
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-            vkPhysicalDevice, vkSurface, &vkSwapChainInfo.m_vkSurfaceCapabilities);
-
-        // Surface Formats
-        vkSwapChainInfo.m_vkSupportedSurfaceFormats = [vkPhysicalDevice, vkSurface]()
+        struct VkSwapChainInfo
         {
-            uint32_t formatCount = 0;
-            vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, nullptr);
+            VkSurfaceCapabilitiesKHR m_vkSurfaceCapabilities = {};
+            std::vector<VkSurfaceFormatKHR> m_vkSupportedSurfaceFormats;
+            std::vector<VkPresentModeKHR> m_vkSupportedPresentModes;
+        };
 
-            std::vector<VkSurfaceFormatKHR> vkSupportedSurfaceFormats(formatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, vkSupportedSurfaceFormats.data());
-
-            return vkSupportedSurfaceFormats;
-        }();
-
-        // Presentation Modes
-        vkSwapChainInfo.m_vkSupportedPresentModes = [vkPhysicalDevice, vkSurface]()
+        struct VkQueueFamilyInfo
         {
-            uint32_t presentCount = 0;
-            vkGetPhysicalDeviceSurfacePresentModesKHR(vkPhysicalDevice, vkSurface, &presentCount, nullptr);
+            // Maps family type to Vulkan queue family index (in the physical device)
+            // Different family types might use the same queue family index.
+            // Useful to query which is the family index of a type.
+            std::array<int, VkQueueFamilyType_Count> m_familyTypeToFamilyIndices;
 
-            std::vector<VkPresentModeKHR> vkSupportedPresentModes(presentCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(vkPhysicalDevice, vkSurface, &presentCount, vkSupportedPresentModes.data());
+            VkQueueFamilyInfo()
+            {
+                // Start with invalid indices
+                m_familyTypeToFamilyIndices.fill(-1);
+            }
 
-            return vkSupportedPresentModes;
-        }();
+            // Check if all families have been found
+            bool IsValid() const
+            {
+                return std::all_of(m_familyTypeToFamilyIndices.begin(), m_familyTypeToFamilyIndices.end(),
+                    [](int index)
+                    {
+                        return index >= 0;
+                    });
+            }
+        };
 
-        VkPhysicalDeviceProperties physicalDeviceProperties;
-        vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
-        DX_LOG(Verbose, "Vulkan Device", "Vulkan Swap Chain Info by '%s':", physicalDeviceProperties.deviceName);
-        DX_LOG(Verbose, "Vulkan Device", "\t- Min image Count: %d", vkSwapChainInfo.m_vkSurfaceCapabilities.minImageCount);
-        DX_LOG(Verbose, "Vulkan Device", "\t- Max image Count: %d", vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageCount);
-        DX_LOG(Verbose, "Vulkan Device", "\t- Current image size: %dx%d",
-            vkSwapChainInfo.m_vkSurfaceCapabilities.currentExtent.width,
-            vkSwapChainInfo.m_vkSurfaceCapabilities.currentExtent.height);
-        DX_LOG(Verbose, "Vulkan Device", "\t- Min image size: %dx%d",
-            vkSwapChainInfo.m_vkSurfaceCapabilities.minImageExtent.width, 
-            vkSwapChainInfo.m_vkSurfaceCapabilities.minImageExtent.height);
-        DX_LOG(Verbose, "Vulkan Device", "\t- Max image size: %dx%d",
-            vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageExtent.width,
-            vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageExtent.height);
-        DX_LOG(Verbose, "Vulkan Device", "\t- Surface formats: %d", vkSwapChainInfo.m_vkSupportedSurfaceFormats.size());
-        DX_LOG(Verbose, "Vulkan Device", "\t- Presentation modes: %d", vkSwapChainInfo.m_vkSupportedPresentModes.size());
+        VkSwapChainInfo PopulateVkSwapChainInfo(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
+        {
+            VkSwapChainInfo vkSwapChainInfo;
 
-        return vkSwapChainInfo;
+            // Surface Capabilities
+            vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+                vkPhysicalDevice, vkSurface, &vkSwapChainInfo.m_vkSurfaceCapabilities);
+
+            // Surface Formats
+            vkSwapChainInfo.m_vkSupportedSurfaceFormats = [vkPhysicalDevice, vkSurface]()
+                {
+                    uint32_t formatCount = 0;
+                    vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, nullptr);
+
+                    std::vector<VkSurfaceFormatKHR> vkSupportedSurfaceFormats(formatCount);
+                    vkGetPhysicalDeviceSurfaceFormatsKHR(vkPhysicalDevice, vkSurface, &formatCount, vkSupportedSurfaceFormats.data());
+
+                    return vkSupportedSurfaceFormats;
+                }();
+
+            // Presentation Modes
+            vkSwapChainInfo.m_vkSupportedPresentModes = [vkPhysicalDevice, vkSurface]()
+                {
+                    uint32_t presentCount = 0;
+                    vkGetPhysicalDeviceSurfacePresentModesKHR(vkPhysicalDevice, vkSurface, &presentCount, nullptr);
+
+                    std::vector<VkPresentModeKHR> vkSupportedPresentModes(presentCount);
+                    vkGetPhysicalDeviceSurfacePresentModesKHR(vkPhysicalDevice, vkSurface, &presentCount, vkSupportedPresentModes.data());
+
+                    return vkSupportedPresentModes;
+                }();
+
+            VkPhysicalDeviceProperties physicalDeviceProperties;
+            vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
+            DX_LOG(Verbose, "Vulkan Device", "Vulkan Swap Chain Info by '%s':", physicalDeviceProperties.deviceName);
+            DX_LOG(Verbose, "Vulkan Device", "\t- Min image Count: %d", vkSwapChainInfo.m_vkSurfaceCapabilities.minImageCount);
+            DX_LOG(Verbose, "Vulkan Device", "\t- Max image Count: %d", vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageCount);
+            DX_LOG(Verbose, "Vulkan Device", "\t- Current image size: %dx%d",
+                vkSwapChainInfo.m_vkSurfaceCapabilities.currentExtent.width,
+                vkSwapChainInfo.m_vkSurfaceCapabilities.currentExtent.height);
+            DX_LOG(Verbose, "Vulkan Device", "\t- Min image size: %dx%d",
+                vkSwapChainInfo.m_vkSurfaceCapabilities.minImageExtent.width,
+                vkSwapChainInfo.m_vkSurfaceCapabilities.minImageExtent.height);
+            DX_LOG(Verbose, "Vulkan Device", "\t- Max image size: %dx%d",
+                vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageExtent.width,
+                vkSwapChainInfo.m_vkSurfaceCapabilities.maxImageExtent.height);
+            DX_LOG(Verbose, "Vulkan Device", "\t- Surface formats: %d", vkSwapChainInfo.m_vkSupportedSurfaceFormats.size());
+            DX_LOG(Verbose, "Vulkan Device", "\t- Presentation modes: %d", vkSwapChainInfo.m_vkSupportedPresentModes.size());
+
+            return vkSwapChainInfo;
+        }
+
+        VkQueueFamilyInfo EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
+        {
+            // Queue family properties of a Vulkan physical devices
+            const std::vector<VkQueueFamilyProperties> queueFamilyProperties = [vkPhysicalDevice]()
+                {
+                    uint32_t queueFamilyCount = 0;
+                    vkGetPhysicalDeviceQueueFamilyProperties(vkPhysicalDevice, &queueFamilyCount, nullptr);
+
+                    std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
+                    vkGetPhysicalDeviceQueueFamilyProperties(vkPhysicalDevice, &queueFamilyCount, queueFamilyProperties.data());
+
+                    return queueFamilyProperties;
+                }();
+
+            VkQueueFamilyInfo vkQueueFamilyInfo;
+            for (int queueFamilyIndex = 0; queueFamilyIndex < queueFamilyProperties.size() && !vkQueueFamilyInfo.IsValid(); ++queueFamilyIndex)
+            {
+                // ------------------
+                // Check Graphics
+                const bool queueFamilySupportsGraphics =
+                    queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT &&
+                    queueFamilyProperties[queueFamilyIndex].queueCount > 0;
+
+                // If Graphics is supported and it's the first queue family found for it, assign it.
+                if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Graphics] < 0 &&
+                    queueFamilySupportsGraphics)
+                {
+                    vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Graphics] = queueFamilyIndex;
+                }
+
+                // ------------------
+                // Check Compute
+                const bool queueFamilySupportsCompute =
+                    queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_COMPUTE_BIT &&
+                    queueFamilyProperties[queueFamilyIndex].queueCount > 0;
+
+                // If Compute is supported and it's the first queue family found for it, assign it.
+                if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Compute] < 0 &&
+                    queueFamilySupportsCompute)
+                {
+                    vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Compute] = queueFamilyIndex;
+                }
+
+                // ------------------
+                // Check Presentation
+                VkBool32 vkQueueFamilySupportsSurface = false;
+                vkGetPhysicalDeviceSurfaceSupportKHR(vkPhysicalDevice, queueFamilyIndex, vkSurface, &vkQueueFamilySupportsSurface);
+
+                const bool queueFamilySupportsPresentation =
+                    vkQueueFamilySupportsSurface &&
+                    queueFamilyProperties[queueFamilyIndex].queueCount > 0;
+
+                // If Presentation is supported and it's the first queue family found for it, assign it.
+                if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Presentation] < 0 &&
+                    queueFamilySupportsPresentation)
+                {
+                    vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Presentation] = queueFamilyIndex;
+                }
+            }
+
+            return vkQueueFamilyInfo;
+        }
+
+        bool VkDeviceExtensionsSupported(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions)
+        {
+            const std::vector<VkExtensionProperties> extensionsProperties = [vkPhysicalDevice]()
+                {
+                    // Get number of Vulkan instance extensions
+                    uint32_t extensionCount = 0;
+                    vkEnumerateDeviceExtensionProperties(vkPhysicalDevice, nullptr, &extensionCount, nullptr);
+
+                    // Get list of Vulkan instance extensions supported
+                    std::vector<VkExtensionProperties> extensionsProperties(extensionCount);
+                    vkEnumerateDeviceExtensionProperties(vkPhysicalDevice, nullptr, &extensionCount, extensionsProperties.data());
+
+                    return extensionsProperties;
+                }();
+
+            VkPhysicalDeviceProperties physicalDeviceProperties;
+            vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
+            DX_LOG(Verbose, "Vulkan Device", "Vulkan device extensions supported by '%s': %d",
+                physicalDeviceProperties.deviceName, extensionsProperties.size());
+            for (const auto& extensionProperties : extensionsProperties)
+            {
+                DX_LOG(Verbose, "Vulkan Device", "\t- %s", extensionProperties.extensionName);
+            }
+
+            return std::all_of(extensions.begin(), extensions.end(),
+                [&extensionsProperties](const char* extension)
+                {
+                    return std::find_if(extensionsProperties.begin(), extensionsProperties.end(),
+                    [extension](const VkExtensionProperties& extensionProperties)
+                        {
+                            return strcmp(extensionProperties.extensionName, extension) == 0;
+                        }) != extensionsProperties.end();
+                });
+        }
+
+        bool CheckVkPhysicalDeviceSuitable(
+            VkPhysicalDevice vkPhysicalDevice,
+            VkSurfaceKHR vkSurface,
+            const std::vector<const char*>& extensions)
+        {
+            // Information about the device itself (ID, name, type, vendor, etc.)
+            //VkPhysicalDeviceProperties vkPhysicalDeviceProperties;
+            //vkGetPhysicalDeviceProperties(vkPhysicalDevice, &vkPhysicalDeviceProperties);
+
+            // Information about what the device can do (geometry shader, tessellation shaders, wide lines, etc.)
+            //VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures;
+            //vkGetPhysicalDeviceFeatures(vkPhysicalDevice, &vkPhysicalDeviceFeatures);
+
+            // Check device extensions support
+            if (!VkDeviceExtensionsSupported(vkPhysicalDevice, extensions))
+            {
+                return false;
+            }
+
+            // Check Swap Chain support
+            const VkSwapChainInfo vkSwapChainInfo = PopulateVkSwapChainInfo(vkPhysicalDevice, vkSurface);
+            if (vkSwapChainInfo.m_vkSupportedSurfaceFormats.empty() ||
+                vkSwapChainInfo.m_vkSupportedPresentModes.empty())
+            {
+                return false;
+            }
+
+            // Check Queue Families support
+            const VkQueueFamilyInfo vkQueueFamilyInfo = EnumerateVkQueueFamilies(vkPhysicalDevice, vkSurface);
+
+            return vkQueueFamilyInfo.IsValid();
+        }
     }
 
     Device::Device(Instance* instance, VkSurfaceKHR vkSurface)
@@ -90,7 +251,7 @@ namespace Vulkan
 
         DX_LOG(Info, "Vulkan Device", "Initializing Vulkan Device...");
 
-        if (!CreateVkLogicalDevice())
+        if (!CreateVkDevice())
         {
             Terminate();
             return false;
@@ -107,7 +268,6 @@ namespace Vulkan
         m_vkDevice = nullptr;
         m_vkQueues.fill(nullptr);
         m_vkPhysicalDevice = nullptr;
-        m_vkQueueFamilyInfo = VkQueueFamilyInfo();
     }
 
     VkDevice Device::GetVkDevice()
@@ -115,147 +275,7 @@ namespace Vulkan
         return m_vkDevice;
     }
 
-    bool Device::VkQueueFamilyInfo::IsValid() const
-    {
-        return std::all_of(m_familyTypeToFamilyIndices.begin(), m_familyTypeToFamilyIndices.end(),
-            [](int index) 
-            {
-                return index >= 0;
-            });
-    }
-
-    bool Device::CheckVkPhysicalDeviceSuitable(
-        VkPhysicalDevice vkPhysicalDevice, 
-        VkSurfaceKHR vkSurface, 
-        const std::vector<const char*>& extensions) const
-    {
-        // Information about the device itself (ID, name, type, vendor, etc.)
-        //VkPhysicalDeviceProperties vkPhysicalDeviceProperties;
-        //vkGetPhysicalDeviceProperties(vkPhysicalDevice, &vkPhysicalDeviceProperties);
-
-        // Information about what the device can do (geometry shader, tessellation shaders, wide lines, etc.)
-        //VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures;
-        //vkGetPhysicalDeviceFeatures(vkPhysicalDevice, &vkPhysicalDeviceFeatures);
-
-        // Check device extensions support
-        if (!VkDeviceExtensionsSupported(vkPhysicalDevice, extensions))
-        {
-            return false;
-        }
-
-        // Check Swap Chain support
-        const VkSwapChainInfo vkSwapChainInfo = PopulateVkSwapChainInfo(vkPhysicalDevice, vkSurface);
-        if (vkSwapChainInfo.m_vkSupportedSurfaceFormats.empty() ||
-            vkSwapChainInfo.m_vkSupportedPresentModes.empty())
-        {
-            return false;
-        }
-
-        // Check Queue Families support
-        const VkQueueFamilyInfo vkQueueFamilyInfo = EnumerateVkQueueFamilies(vkPhysicalDevice);
-
-        return vkQueueFamilyInfo.IsValid();
-    }
-
-    bool Device::VkDeviceExtensionsSupported(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions) const
-    {
-        const std::vector<VkExtensionProperties> extensionsProperties = [vkPhysicalDevice]()
-            {
-                // Get number of Vulkan instance extensions
-                uint32_t extensionCount = 0;
-                vkEnumerateDeviceExtensionProperties(vkPhysicalDevice, nullptr, &extensionCount, nullptr);
-
-                // Get list of Vulkan instance extensions supported
-                std::vector<VkExtensionProperties> extensionsProperties(extensionCount);
-                vkEnumerateDeviceExtensionProperties(vkPhysicalDevice, nullptr, &extensionCount, extensionsProperties.data());
-
-                return extensionsProperties;
-            }();
-
-        VkPhysicalDeviceProperties physicalDeviceProperties;
-        vkGetPhysicalDeviceProperties(vkPhysicalDevice, &physicalDeviceProperties);
-        DX_LOG(Verbose, "Vulkan Device", "Vulkan device extensions supported by '%s': %d", 
-            physicalDeviceProperties.deviceName, extensionsProperties.size());
-        for (const auto& extensionProperties : extensionsProperties)
-        {
-            DX_LOG(Verbose, "Vulkan Device", "\t- %s", extensionProperties.extensionName);
-        }
-
-        return std::all_of(extensions.begin(), extensions.end(),
-            [&extensionsProperties](const char* extension)
-            {
-                return std::find_if(extensionsProperties.begin(), extensionsProperties.end(),
-                [extension](const VkExtensionProperties& extensionProperties)
-                    {
-                        return strcmp(extensionProperties.extensionName, extension) == 0;
-                    }) != extensionsProperties.end();
-            });
-    }
-
-    Device::VkQueueFamilyInfo Device::EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice) const
-    {
-        // Queue family properties of a Vulkan physical devices
-        const std::vector<VkQueueFamilyProperties> queueFamilyProperties = [vkPhysicalDevice]()
-            {
-                uint32_t queueFamilyCount = 0;
-                vkGetPhysicalDeviceQueueFamilyProperties(vkPhysicalDevice, &queueFamilyCount, nullptr);
-
-                std::vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyCount);
-                vkGetPhysicalDeviceQueueFamilyProperties(vkPhysicalDevice, &queueFamilyCount, queueFamilyProperties.data());
-
-                return queueFamilyProperties;
-            }();
-
-        VkQueueFamilyInfo vkQueueFamilyInfo;
-        for (int queueFamilyIndex = 0; queueFamilyIndex < queueFamilyProperties.size() && !vkQueueFamilyInfo.IsValid(); ++queueFamilyIndex)
-        {
-            // ------------------
-            // Check Graphics
-            const bool queueFamilySupportsGraphics =
-                queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT &&
-                queueFamilyProperties[queueFamilyIndex].queueCount > 0;
-
-            // If Graphics is supported and it's the first queue family found for it, assign it.
-            if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Graphics] < 0 &&
-                queueFamilySupportsGraphics)
-            {
-                vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Graphics] = queueFamilyIndex;
-            }
-
-            // ------------------
-            // Check Compute
-            const bool queueFamilySupportsCompute =
-                queueFamilyProperties[queueFamilyIndex].queueFlags & VK_QUEUE_COMPUTE_BIT &&
-                queueFamilyProperties[queueFamilyIndex].queueCount > 0;
-
-            // If Compute is supported and it's the first queue family found for it, assign it.
-            if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Compute] < 0 &&
-                queueFamilySupportsCompute)
-            {
-                vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Compute] = queueFamilyIndex;
-            }
-
-            // ------------------
-            // Check Presentation
-            VkBool32 vkQueueFamilySupportsSurface = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(vkPhysicalDevice, queueFamilyIndex, m_vkSurface, &vkQueueFamilySupportsSurface);
-
-            const bool queueFamilySupportsPresentation =
-                vkQueueFamilySupportsSurface &&
-                queueFamilyProperties[queueFamilyIndex].queueCount > 0;
-
-            // If Presentation is supported and it's the first queue family found for it, assign it.
-            if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Presentation] < 0 &&
-                queueFamilySupportsPresentation)
-            {
-                vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Presentation] = queueFamilyIndex;
-            }
-        }
-
-        return vkQueueFamilyInfo;
-    }
-
-    bool Device::CreateVkLogicalDevice()
+    bool Device::CreateVkDevice()
     {
         // Physical devices that the Vulkan instance can access
         const std::vector<VkPhysicalDevice> physicalDevices = [this]()
@@ -292,28 +312,27 @@ namespace Vulkan
         auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
             [this, &vkDeviceExtensions](VkPhysicalDevice physicalDevice)
             {
-                return CheckVkPhysicalDeviceSuitable(physicalDevice, m_vkSurface, vkDeviceExtensions);
+                return Utils::CheckVkPhysicalDeviceSuitable(physicalDevice, m_vkSurface, vkDeviceExtensions);
             });
-        if (physicalDeviceIt != physicalDevices.end())
-        {
-            m_vkPhysicalDevice = *physicalDeviceIt;
-            m_vkQueueFamilyInfo = EnumerateVkQueueFamilies(m_vkPhysicalDevice);
-            DX_ASSERT(m_vkQueueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
-
-            VkPhysicalDeviceProperties physicalDeviceProperties;
-            vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, &physicalDeviceProperties);
-            DX_LOG(Verbose, "Vulkan Device", "Physical Device used: %s", physicalDeviceProperties.deviceName);
-
-            DX_LOG(Verbose, "Vulkan Device", "Vulkan device extensions enabled: %d", vkDeviceExtensions.size());
-            for (const auto& vkDeviceExtension : vkDeviceExtensions)
-            {
-                DX_LOG(Verbose, "Vulkan Device", "\t- %s", vkDeviceExtension);
-            }
-        }
-        else
+        if (physicalDeviceIt == physicalDevices.end())
         {
             DX_LOG(Error, "Vulkan Device", "No suitable physical device found in Vulkan instance.");
             return false;
+        }
+
+        m_vkPhysicalDevice = *physicalDeviceIt;
+
+        const Utils::VkQueueFamilyInfo  vkQueueFamilyInfo = Utils::EnumerateVkQueueFamilies(m_vkPhysicalDevice, m_vkSurface);
+        DX_ASSERT(vkQueueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
+
+        VkPhysicalDeviceProperties physicalDeviceProperties;
+        vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, &physicalDeviceProperties);
+        DX_LOG(Verbose, "Vulkan Device", "Physical Device used: %s", physicalDeviceProperties.deviceName);
+
+        DX_LOG(Verbose, "Vulkan Device", "Vulkan device extensions enabled: %d", vkDeviceExtensions.size());
+        for (const auto& vkDeviceExtension : vkDeviceExtensions)
+        {
+            DX_LOG(Verbose, "Vulkan Device", "\t- %s", vkDeviceExtension);
         }
 
         const float queuePriority = 1.0f; // 1.0f is highest priority, 0.0f is lowest priority.
@@ -325,7 +344,7 @@ namespace Vulkan
             std::unordered_set<int> familyIndicesFound; // To keep track of new family indices inside the loop
             for (int familyTypeIndex = 0; familyTypeIndex < VkQueueFamilyType_Count; ++familyTypeIndex)
             {
-                const int familyIndex = m_vkQueueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex];
+                const int familyIndex = vkQueueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex];
 
                 // If this family index has already appeared, skip creation.
                 if (familyIndicesFound.find(familyIndex) != familyIndicesFound.end())
@@ -376,7 +395,7 @@ namespace Vulkan
         {
             vkGetDeviceQueue(
                 m_vkDevice, 
-                m_vkQueueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex], 
+                vkQueueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex], 
                 0, 
                 &m_vkQueues[familyTypeIndex]);
             if (!m_vkQueues[familyTypeIndex])
