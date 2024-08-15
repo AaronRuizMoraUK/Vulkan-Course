@@ -14,6 +14,12 @@ namespace Vulkan
     {
         bool CreateVkShaderModule(VkDevice vkDevice, const std::vector<uint8_t>& shaderByteCode, VkShaderModule* vkShaderModuleOut)
         {
+            if (shaderByteCode.size() % sizeof(uint32_t) != 0)
+            {
+                DX_LOG(Error, "Renderer", "Shader SPIR-V byte code size is not a multiple of 4 bytes");
+                return false;
+            }
+
             VkShaderModuleCreateInfo vkShaderModuleCreateInfo = {};
             vkShaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
             vkShaderModuleCreateInfo.pNext = nullptr;
@@ -103,23 +109,25 @@ namespace Vulkan
         // Create Pipeline
         {
             // Pipeline Shader Stages
-            VkPipelineShaderStageCreateInfo vkPipelineVertexShaderStageCreateInfo = {};
-            vkPipelineVertexShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            vkPipelineVertexShaderStageCreateInfo.pNext = nullptr;
-            vkPipelineVertexShaderStageCreateInfo.flags = 0;
-            vkPipelineVertexShaderStageCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-            vkPipelineVertexShaderStageCreateInfo.module = vertexShaderModule;
-            vkPipelineVertexShaderStageCreateInfo.pName = "main";
-            vkPipelineVertexShaderStageCreateInfo.pSpecializationInfo = nullptr;
+            std::array<VkPipelineShaderStageCreateInfo, 2> vkPipelineShaderStagesCreateInfo;
 
-            VkPipelineShaderStageCreateInfo vkPipelineFragmentShaderStageCreateInfo = {};
-            vkPipelineFragmentShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-            vkPipelineFragmentShaderStageCreateInfo.pNext = nullptr;
-            vkPipelineFragmentShaderStageCreateInfo.flags = 0;
-            vkPipelineFragmentShaderStageCreateInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-            vkPipelineFragmentShaderStageCreateInfo.module = framentShaderModule;
-            vkPipelineFragmentShaderStageCreateInfo.pName = "main";
-            vkPipelineFragmentShaderStageCreateInfo.pSpecializationInfo = nullptr;
+            vkPipelineShaderStagesCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vkPipelineShaderStagesCreateInfo[0].pNext = nullptr;
+            vkPipelineShaderStagesCreateInfo[0].flags = 0;
+            vkPipelineShaderStagesCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+            vkPipelineShaderStagesCreateInfo[0].module = vertexShaderModule;
+            vkPipelineShaderStagesCreateInfo[0].pName = "main";
+            vkPipelineShaderStagesCreateInfo[0].pSpecializationInfo = nullptr;
+
+            vkPipelineShaderStagesCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vkPipelineShaderStagesCreateInfo[1].pNext = nullptr;
+            vkPipelineShaderStagesCreateInfo[1].flags = 0;
+            vkPipelineShaderStagesCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+            vkPipelineShaderStagesCreateInfo[1].module = framentShaderModule;
+            vkPipelineShaderStagesCreateInfo[1].pName = "main";
+            vkPipelineShaderStagesCreateInfo[1].pSpecializationInfo = nullptr;
+
+
         }
 
         // Destroy Shader Models
