@@ -10,6 +10,7 @@ namespace Vulkan
     class Instance;
     class Device;
     class SwapChain;
+    class Pipeline;
 }
 
 typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
@@ -55,6 +56,8 @@ namespace DX
         std::unique_ptr<Vulkan::SwapChain> m_swapChain;
 
     private:
-        bool CreateGraphicsPipeline();
+        bool CreatePipeline();
+
+        std::unique_ptr<Vulkan::Pipeline> m_pipeline;
     };
 } // namespace DX
