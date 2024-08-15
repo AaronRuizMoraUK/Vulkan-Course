@@ -155,9 +155,8 @@ namespace Vulkan
             });
     }
 
-    Device::Device(Instance* instance, VkSurfaceKHR vkSurface)
+    Device::Device(Instance* instance)
         : m_instance(instance)
-        , m_vkSurface(vkSurface)
     {
         m_vkQueues.fill(nullptr);
     }
@@ -196,6 +195,11 @@ namespace Vulkan
         m_vkPhysicalDevice = nullptr;
     }
 
+    Instance* Device::GetInstance()
+    {
+        return m_instance;
+    }
+
     VkDevice Device::GetVkDevice()
     {
         return m_vkDevice;
@@ -204,11 +208,6 @@ namespace Vulkan
     VkPhysicalDevice Device::GetVkPhysicalDevice()
     {
         return m_vkPhysicalDevice;
-    }
-
-    VkSurfaceKHR Device::GetVkSurface()
-    {
-        return m_vkSurface;
     }
 
     const VkQueueFamilyInfo& Device::GetVkQueueFamilyInfo() const
@@ -255,7 +254,7 @@ namespace Vulkan
             auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
                 [this, &vkDeviceExtensions](VkPhysicalDevice physicalDevice)
                 {
-                    return Utils::CheckVkPhysicalDeviceSuitable(physicalDevice, m_vkSurface, vkDeviceExtensions);
+                    return Utils::CheckVkPhysicalDeviceSuitable(physicalDevice, m_instance->GetVkSurface(), vkDeviceExtensions);
                 });
             if (physicalDeviceIt == physicalDevices.end())
             {
@@ -277,7 +276,7 @@ namespace Vulkan
         }
 
         // Queue Family information of the physical device.
-        m_vkQueueFamilyInfo = Utils::EnumerateVkQueueFamilies(m_vkPhysicalDevice, m_vkSurface);
+        m_vkQueueFamilyInfo = Utils::EnumerateVkQueueFamilies(m_vkPhysicalDevice, m_instance->GetVkSurface());
         DX_ASSERT(m_vkQueueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
 
         const float queuePriority = 1.0f; // 1.0f is highest priority, 0.0f is lowest priority.

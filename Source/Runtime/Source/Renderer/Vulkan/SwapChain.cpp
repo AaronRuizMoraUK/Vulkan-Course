@@ -1,11 +1,15 @@
 #include <Renderer/Vulkan/SwapChain.h>
 
+#include <Renderer/Vulkan/Instance.h>
 #include <Renderer/Vulkan/Device.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
 
-#include <vulkan/vulkan.h>
+// Necessary to ask GLFW:
+// - The frame buffer size
+#define GLFW_INCLUDE_VULKAN // This will cause glfw3.h to include vulkan.h already
+#include <GLFW/glfw3.h>
 
 #include <algorithm>
 #include <unordered_set>
@@ -137,15 +141,19 @@ namespace Vulkan
 
         VkExtent2D ObtainSwapChainImageExtent(
             const VkSurfaceCapabilitiesKHR& vkSurfaceCapabilities,
-            const Math::Vector2Int& frameBufferSize)
+            GLFWwindow* windowHandler)
         {
             // If current extent is at numeric limits, that means the extent can vary.
             // In this case use the frame buffer size.
             if (vkSurfaceCapabilities.currentExtent.width == std::numeric_limits<uint32_t>::max())
             {
+                // Get frame buffer size in pixels from GLWF
+                int width = 0, height = 0;
+                glfwGetFramebufferSize(windowHandler, &width, &height);
+
                 // Make sure size stays within surface max/min image extent values.
                 Math::Vector2Int clampedFrameBufferSize = mathfu::Clamp(
-                    frameBufferSize, 
+                    Math::Vector2Int(width, height),
                     Math::Vector2Int(vkSurfaceCapabilities.minImageExtent.width, vkSurfaceCapabilities.minImageExtent.height),
                     Math::Vector2Int(vkSurfaceCapabilities.maxImageExtent.width, vkSurfaceCapabilities.maxImageExtent.height));
 
@@ -197,9 +205,8 @@ namespace Vulkan
             && !vkSwapChainInfo.m_vkSupportedPresentModes.empty();
     }
 
-    SwapChain::SwapChain(Device* device, const Math::Vector2Int& defaultFrameBufferSize)
+    SwapChain::SwapChain(Device* device)
         : m_device(device)
-        , m_defaultFrameBufferSize(defaultFrameBufferSize)
     {
     }
 
@@ -244,12 +251,12 @@ namespace Vulkan
     bool SwapChain::CreateVkSwapChain()
     {
         const Utils::VkSwapChainInfo vkSwapChainInfo = 
-            Utils::PopulateVkSwapChainInfo(m_device->GetVkPhysicalDevice(), m_device->GetVkSurface());
+            Utils::PopulateVkSwapChainInfo(m_device->GetVkPhysicalDevice(), m_device->GetInstance()->GetVkSurface());
 
         // Find optimal surface values for our swap chain.
         const VkSurfaceFormatKHR vkSurfaceFormat = Utils::ChooseBestSurfaceFormat(vkSwapChainInfo.m_vkSupportedSurfaceFormats);
         const VkPresentModeKHR vkPresentMode = Utils::ChooseBestPresentMode(vkSwapChainInfo.m_vkSupportedPresentModes);
-        const VkExtent2D vkImageExtent = Utils::ObtainSwapChainImageExtent(vkSwapChainInfo.m_vkSurfaceCapabilities, m_defaultFrameBufferSize);
+        const VkExtent2D vkImageExtent = Utils::ObtainSwapChainImageExtent(vkSwapChainInfo.m_vkSurfaceCapabilities, m_device->GetInstance()->GetWindowHandler());
 
         // Number of images in the swap chain.
         // Use 1 more than the minimum to allow triple buffering.
@@ -285,7 +292,7 @@ namespace Vulkan
         vkSwapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
         vkSwapchainCreateInfo.pNext = nullptr;
         vkSwapchainCreateInfo.flags = 0;
-        vkSwapchainCreateInfo.surface = m_device->GetVkSurface();
+        vkSwapchainCreateInfo.surface = m_device->GetInstance()->GetVkSurface();
         vkSwapchainCreateInfo.minImageCount = imageCount;
         vkSwapchainCreateInfo.imageFormat = vkSurfaceFormat.format;
         vkSwapchainCreateInfo.imageColorSpace = vkSurfaceFormat.colorSpace;

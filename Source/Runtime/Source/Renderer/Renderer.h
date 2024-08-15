@@ -13,8 +13,6 @@ namespace Vulkan
     class Pipeline;
 }
 
-typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
-
 namespace DX
 {
     using RendererId = GenericId<struct RendererIdTag>;
@@ -46,12 +44,10 @@ namespace DX
 
     private:
         bool CreateInstance();
-        bool CreateVkSurface();
         bool CreateDevice();
         bool CreateSwapChain();
 
         std::unique_ptr<Vulkan::Instance> m_instance;
-        VkSurfaceKHR m_vkSurface = nullptr;
         std::unique_ptr<Vulkan::Device> m_device;
         std::unique_ptr<Vulkan::SwapChain> m_swapChain;
 

@@ -26,7 +26,7 @@ namespace Vulkan
     public:
         static bool CheckSwapChainSupported(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface);
 
-        SwapChain(Device* device, const Math::Vector2Int& defaultFrameBufferSize);
+        SwapChain(Device* device);
         ~SwapChain();
 
         SwapChain(const SwapChain&) = delete;
@@ -37,7 +37,6 @@ namespace Vulkan
 
     private:
         Device* m_device = nullptr;
-        const Math::Vector2Int m_defaultFrameBufferSize;
 
     private:
         bool CreateVkSwapChain();

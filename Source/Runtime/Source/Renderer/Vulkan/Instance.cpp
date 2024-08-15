@@ -3,7 +3,9 @@
 #include <Log/Log.h>
 #include <Debug/Debug.h>
 
-// Necessary to ask GLFW what Vulkan instance extensions it needs
+// Necessary to ask GLFW:
+// - What Vulkan instance extensions it needs
+// - To create a Vulkan surface for the window
 #define GLFW_INCLUDE_VULKAN // This will cause glfw3.h to include vulkan.h already
 #include <GLFW/glfw3.h>
 
@@ -166,6 +168,11 @@ namespace Vulkan
         }
     } // namespace Utils
 
+    Instance::Instance(GLFWwindow* windowHandler)
+        : m_windowHandler(windowHandler)
+    {
+    }
+
     Instance::~Instance()
     {
         Terminate();
@@ -186,12 +193,21 @@ namespace Vulkan
             return false;
         }
 
+        if (!CreateVkSurface())
+        {
+            Terminate();
+            return false;
+        }
+
         return true;
     }
 
     void Instance::Terminate()
     {
         DX_LOG(Info, "Vulkan Instance", "Terminating Vulkan Instance...");
+
+        vkDestroySurfaceKHR(m_vkInstance, m_vkSurface, nullptr);
+        m_vkSurface = nullptr;
 
         Validation::DestroyDebugUtilsMessengerEXT(m_vkInstance, m_vkDebugUtilsMessenger, nullptr);
         m_vkDebugUtilsMessenger = nullptr;
@@ -200,9 +216,19 @@ namespace Vulkan
         m_vkInstance = nullptr;
     }
 
+    GLFWwindow* Instance::GetWindowHandler()
+    {
+        return m_windowHandler;
+    }
+
     VkInstance Instance::GetVkInstance()
     {
         return m_vkInstance;
+    }
+
+    VkSurfaceKHR Instance::GetVkSurface()
+    {
+        return m_vkSurface;
     }
 
     bool Instance::CreateVkInstance()
@@ -298,6 +324,21 @@ namespace Vulkan
                 DX_LOG(Error, "Vulkan Instance", "Failed to create Vulkan debug utils messenger.");
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    bool Instance::CreateVkSurface()
+    {
+        // It uses GLFW library to create the Vulkan surface for the window it handles.
+        // The surface creates must match the operative system, for example on Windows
+        // it will use vkCreateWin32SurfaceKHR. GLFW handles this automatically and creates
+        // the appropriate Vulkan surface.
+        if (glfwCreateWindowSurface(m_vkInstance, m_windowHandler, nullptr, &m_vkSurface) != VK_SUCCESS)
+        {
+            DX_LOG(Error, "Vulkan Instance", "Failed to create Vulkan surface for the window.");
+            return false;
         }
 
         return true;

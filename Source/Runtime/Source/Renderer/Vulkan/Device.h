@@ -2,7 +2,6 @@
 
 #include <array>
 
-typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
 typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkDevice_T* VkDevice;
 typedef struct VkQueue_T* VkQueue;
@@ -41,7 +40,7 @@ namespace Vulkan
     class Device
     {
     public:
-        Device(Instance* instance, VkSurfaceKHR vkSurface);
+        Device(Instance* instance);
         ~Device();
 
         Device(const Device&) = delete;
@@ -50,15 +49,14 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
+        Instance* GetInstance();
         VkDevice GetVkDevice();
         VkPhysicalDevice GetVkPhysicalDevice();
-        VkSurfaceKHR GetVkSurface();
 
         const VkQueueFamilyInfo& GetVkQueueFamilyInfo() const;
 
     private:
         Instance* m_instance = nullptr;
-        VkSurfaceKHR m_vkSurface = nullptr;
 
     private:
         bool CreateVkDevice();
