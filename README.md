@@ -2,6 +2,8 @@
 
 <img src="./Vulkan-logo.png">
 
+***- Vulkan Course in progress -***
+
 Project generated while doing the Udemy course *[Learn the Vulkan API with C++](https://www.udemy.com/course/learn-the-vulkan-api-with-cpp/)* by Ben Cook.
 
 ## Build and Run
