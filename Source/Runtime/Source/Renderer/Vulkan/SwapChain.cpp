@@ -158,7 +158,7 @@ namespace Vulkan
             }
         }
 
-        bool CreateImageView(VkDevice vkDevice, VkImage vkImage, VkFormat vkFormat, VkImageAspectFlags vkAspectFlags, VkImageView* vkImageViewOut)
+        bool CreateVkImageView(VkDevice vkDevice, VkImage vkImage, VkFormat vkFormat, VkImageAspectFlags vkAspectFlags, VkImageView* vkImageViewOut)
         {
             VkImageViewCreateInfo vkImageViewCreateInfo = {};
             vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -187,7 +187,7 @@ namespace Vulkan
 
             return true;
         }
-    }
+    } // namespace Utils
 
     bool SwapChain::CheckSwapChainSupported(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
     {
@@ -336,7 +336,7 @@ namespace Vulkan
                     [this](VkImage vkImage) -> VkImageView
                     {
                         if (VkImageView vkImageView = nullptr;
-                            Utils::CreateImageView(m_device->GetVkDevice(), vkImage, 
+                            Utils::CreateVkImageView(m_device->GetVkDevice(), vkImage,
                                 static_cast<VkFormat>(m_imageFormat), VK_IMAGE_ASPECT_COLOR_BIT, &vkImageView))
                         {
                             return vkImageView;

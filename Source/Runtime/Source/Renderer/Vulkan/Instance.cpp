@@ -49,7 +49,7 @@ namespace Vulkan
 
         static VkDebugUtilsMessengerCreateInfoEXT DebugUtilsMessengerCreateInfo()
         {
-            VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo;
+            VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
             debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
             debugCreateInfo.pNext = nullptr;
             debugCreateInfo.flags = 0;
@@ -96,7 +96,7 @@ namespace Vulkan
                 func(instance, debugMessenger, pAllocator);
             }
         }
-    }
+    } // namespace Validation
 
     // Utils to extract information and perform checks on Vulkan Instances
     namespace Utils
@@ -164,7 +164,7 @@ namespace Vulkan
                         }) != extensionsProperties.end();
                 });
         }
-    }
+    } // namespace Utils
 
     Instance::~Instance()
     {
@@ -262,7 +262,7 @@ namespace Vulkan
             DX_LOG(Verbose, "Vulkan Instance", "\t- %s", vkInstanceExtension);
         }
 
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo; // Here to ensure it is not destroyed before vkCreateInstance call
+        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {}; // Here to ensure it is not destroyed before vkCreateInstance call
 
         VkInstanceCreateInfo vkInstanceCreateInfo = {};
         vkInstanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;

@@ -53,5 +53,8 @@ namespace DX
         VkSurfaceKHR m_vkSurface = nullptr;
         std::unique_ptr<Vulkan::Device> m_device;
         std::unique_ptr<Vulkan::SwapChain> m_swapChain;
+
+    private:
+        bool CreateGraphicsPipeline();
     };
 } // namespace DX

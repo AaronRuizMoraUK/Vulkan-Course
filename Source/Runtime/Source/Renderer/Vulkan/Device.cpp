@@ -13,15 +13,6 @@
 
 namespace Vulkan
 {
-    bool VkQueueFamilyInfo::IsValid() const
-    {
-        return std::all_of(m_familyTypeToFamilyIndices.begin(), m_familyTypeToFamilyIndices.end(),
-            [](int index)
-            {
-                return index >= 0;
-            });
-    }
-
     // Utils to extract information and perform checks on Vulkan Physical Devices
     namespace Utils
     {
@@ -153,6 +144,15 @@ namespace Vulkan
 
             return vkQueueFamilyInfo.IsValid();
         }
+    } // namespace Utils
+
+    bool VkQueueFamilyInfo::IsValid() const
+    {
+        return std::all_of(m_familyTypeToFamilyIndices.begin(), m_familyTypeToFamilyIndices.end(),
+            [](int index)
+            {
+                return index >= 0;
+            });
     }
 
     Device::Device(Instance* instance, VkSurfaceKHR vkSurface)
