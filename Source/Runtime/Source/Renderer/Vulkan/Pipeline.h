@@ -1,5 +1,11 @@
 #pragma once
 
+#include <Math/Rectangle.h>
+
+typedef struct VkRenderPass_T* VkRenderPass;
+typedef struct VkPipelineLayout_T* VkPipelineLayout;
+typedef struct VkPipeline_T* VkPipeline;
+
 namespace Vulkan
 {
     class Device;
@@ -8,7 +14,7 @@ namespace Vulkan
     class Pipeline
     {
     public:
-        Pipeline(Device* device);
+        Pipeline(Device* device, int imageFormat, const Math::Rectangle& viewport);
         ~Pipeline();
 
         Pipeline(const Pipeline&) = delete;
@@ -19,8 +25,16 @@ namespace Vulkan
 
     private:
         Device* m_device = nullptr;
+        int m_imageFormat = -1;
+        Math::Rectangle m_viewport;
 
     private:
+        bool CreateVkRenderPass();
+        bool CreateVkPipelineLayout();
         bool CreateVkPipeline();
+
+        VkRenderPass m_vkRenderPass = nullptr;
+        VkPipelineLayout m_vkPipelineLayout = nullptr;
+        VkPipeline m_vkPipeline = nullptr;
     };
 } // namespace Vulkan
