@@ -35,6 +35,9 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
+        int GetImageFormat() const;
+        const Math::Vector2Int& GetImageSize() const;
+
     private:
         Device* m_device = nullptr;
 

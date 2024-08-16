@@ -248,6 +248,16 @@ namespace Vulkan
         m_vkSwapChain = nullptr;
     }
 
+    int SwapChain::GetImageFormat() const
+    {
+        return m_imageFormat;
+    }
+
+    const Math::Vector2Int& SwapChain::GetImageSize() const
+    {
+        return m_imageSize;
+    }
+
     bool SwapChain::CreateVkSwapChain()
     {
         const Utils::VkSwapChainInfo vkSwapChainInfo = 
