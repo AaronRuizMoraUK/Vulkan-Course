@@ -35,7 +35,7 @@ namespace DX
         }
 
         // Window is resizable if it's not full screen
-        // TODO: Not resizable yet to make it simpler.
+        // TODO: Not resizable to make it simpler to deal with Vulkan.
         const bool resizeable = false; //!m_fullScreen;
 
         // Do not use any client API

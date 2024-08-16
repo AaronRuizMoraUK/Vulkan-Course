@@ -40,7 +40,6 @@ namespace DX
     private:
         RendererId m_rendererId;
         Window* m_window = nullptr;
-        WindowResizeEvent::Handler m_windowResizeHandler;
 
     private:
         bool CreateInstance();

@@ -61,8 +61,6 @@ namespace DX
     {
         DX_LOG(Info, "Renderer", "Terminating Renderer...");
 
-        m_window->UnregisterWindowResizeEvent(m_windowResizeHandler);
-
         m_pipeline.reset();
         m_swapChain.reset();
         m_device.reset();
@@ -115,7 +113,12 @@ namespace DX
 
     bool Renderer::CreatePipeline()
     {
-        m_pipeline = std::make_unique<Vulkan::Pipeline>(m_device.get());
+        // Viewport
+        const Math::Rectangle viewport(
+            Math::Vector2(0.0f, 0.0f),
+            Math::Vector2(m_swapChain->GetImageSize()));
+
+        m_pipeline = std::make_unique<Vulkan::Pipeline>(m_device.get(), m_swapChain->GetImageFormat(), viewport);
 
         if (!m_pipeline->Initialize())
         {
