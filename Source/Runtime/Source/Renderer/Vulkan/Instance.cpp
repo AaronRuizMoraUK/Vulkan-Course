@@ -49,25 +49,21 @@ namespace Vulkan
             return VK_FALSE;
         }
 
-        static VkDebugUtilsMessengerCreateInfoEXT DebugUtilsMessengerCreateInfo()
-        {
-            VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
-            debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            debugCreateInfo.pNext = nullptr;
-            debugCreateInfo.flags = 0;
-            debugCreateInfo.messageSeverity =
+        static const VkDebugUtilsMessengerCreateInfoEXT DebugUtilsMessengerCreateInfo = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+            .pNext = nullptr,
+            .flags = 0,
+            .messageSeverity =
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-            debugCreateInfo.messageType =
+                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+            .messageType =
                 VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;;
-            debugCreateInfo.pfnUserCallback = DebugCallback;
-            debugCreateInfo.pUserData = nullptr;
-
-            return debugCreateInfo;
-        }
+                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+            .pfnUserCallback = DebugCallback,
+            .pUserData = nullptr
+        };
 
         static VkResult CreateDebugUtilsMessengerEXT(
             VkInstance instance,
@@ -77,9 +73,7 @@ namespace Vulkan
             auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
             if (func != nullptr)
             {
-                const VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = DebugUtilsMessengerCreateInfo();
-
-                return func(instance, &debugCreateInfo, pAllocator, pDebugMessenger);
+                return func(instance, &DebugUtilsMessengerCreateInfo, pAllocator, pDebugMessenger);
             }
             else
             {
@@ -288,21 +282,13 @@ namespace Vulkan
             DX_LOG(Verbose, "Vulkan Instance", "\t- %s", vkInstanceExtension);
         }
 
-        VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {}; // Here to ensure it is not destroyed before vkCreateInstance call
-
         VkInstanceCreateInfo vkInstanceCreateInfo = {};
         vkInstanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        if (Validation::DebugEnabled)
-        {
-            // Include debug create info here so it also logs validation messages
-            // for vkCreateInstance and vkDestroyInstance functions.
-            debugCreateInfo = Validation::DebugUtilsMessengerCreateInfo();
-            vkInstanceCreateInfo.pNext = &debugCreateInfo;
-        }
-        else
-        {
-            vkInstanceCreateInfo.pNext = nullptr;
-        }
+        // Include debug create info here so it also logs validation messages
+        // for vkCreateInstance and vkDestroyInstance functions.
+        vkInstanceCreateInfo.pNext = (Validation::DebugEnabled)
+            ? &Validation::DebugUtilsMessengerCreateInfo
+            : nullptr;
         vkInstanceCreateInfo.flags = 0;
         vkInstanceCreateInfo.pApplicationInfo = &vkAppInfo;
         vkInstanceCreateInfo.enabledLayerCount = static_cast<uint32_t>(vkInstanceLayers.size());
