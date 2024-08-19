@@ -194,6 +194,7 @@ namespace Vulkan
 
     bool FrameBuffer::CreateVkFrameBuffer()
     {
+        // List of attachment (1:1 with Render Pass)
         std::vector<VkImageView> attachments = { m_vkColorImageView };
         if (m_vkDepthImageView)
         {
@@ -204,7 +205,7 @@ namespace Vulkan
         vkFramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         vkFramebufferCreateInfo.pNext = nullptr;
         vkFramebufferCreateInfo.flags = 0;
-        vkFramebufferCreateInfo.renderPass = m_vkRenderPass;
+        vkFramebufferCreateInfo.renderPass = m_vkRenderPass; // Render pass the FrameBuffer will be used with
         vkFramebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         vkFramebufferCreateInfo.pAttachments = attachments.data();
         vkFramebufferCreateInfo.width = m_colorImage.m_size.x;
