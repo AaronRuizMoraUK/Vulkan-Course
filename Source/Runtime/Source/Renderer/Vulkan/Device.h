@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <vector>
 
 typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkDevice_T* VkDevice;
@@ -10,23 +11,26 @@ namespace Vulkan
 {
     class Instance;
 
-    enum VkQueueFamilyType
+    enum QueueFamilyType
     {
-        VkQueueFamilyType_Graphics = 0,
-        VkQueueFamilyType_Compute,
-        VkQueueFamilyType_Presentation,
+        QueueFamilyType_Graphics = 0,
+        QueueFamilyType_Compute,
+        QueueFamilyType_Presentation,
 
-        VkQueueFamilyType_Count,
+        QueueFamilyType_Count,
     };
 
-    // Maps family type to Vulkan queue family index (in the physical device)
-    // Different family types might use the same queue family index.
-    // Useful to query which is the family index of a type.
-    struct VkQueueFamilyInfo
+    struct QueueFamilyInfo
     {
-        std::array<int, VkQueueFamilyType_Count> m_familyTypeToFamilyIndices;
+        // Maps family type to Vulkan queue family index (in the physical device)
+        // Different family types might use the same queue family index.
+        // Useful to query which is the family index of a type.
+        std::array<int, QueueFamilyType_Count> m_familyTypeToFamilyIndices;
 
-        VkQueueFamilyInfo()
+        // List of unique queue family indices.
+        std::vector<uint32_t> m_uniqueQueueFamilyIndices;
+
+        QueueFamilyInfo()
         {
             // Start with invalid indices
             m_familyTypeToFamilyIndices.fill(-1);
@@ -53,7 +57,7 @@ namespace Vulkan
         VkDevice GetVkDevice();
         VkPhysicalDevice GetVkPhysicalDevice();
 
-        const VkQueueFamilyInfo& GetVkQueueFamilyInfo() const;
+        const QueueFamilyInfo& GetQueueFamilyInfo() const;
 
     private:
         Instance* m_instance = nullptr;
@@ -62,8 +66,8 @@ namespace Vulkan
         bool CreateVkDevice();
 
         VkPhysicalDevice m_vkPhysicalDevice = nullptr;
-        VkQueueFamilyInfo m_vkQueueFamilyInfo;
+        QueueFamilyInfo m_queueFamilyInfo;
         VkDevice m_vkDevice = nullptr;
-        std::array<VkQueue, VkQueueFamilyType_Count> m_vkQueues;
+        std::array<VkQueue, QueueFamilyType_Count> m_vkQueues;
     };
 } // namespace Vulkan

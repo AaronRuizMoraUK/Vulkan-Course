@@ -93,6 +93,11 @@ namespace Vulkan
         m_vkRenderPass = nullptr;
     }
 
+    VkRenderPass Pipeline::GetVkRenderPass()
+    {
+        return m_vkRenderPass;
+    }
+
     bool Pipeline::CreateVkRenderPass()
     {
         // About image layouts in attachments

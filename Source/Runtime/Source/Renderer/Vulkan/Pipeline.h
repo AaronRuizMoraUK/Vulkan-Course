@@ -23,6 +23,8 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
+        VkRenderPass GetVkRenderPass();
+
     private:
         Device* m_device = nullptr;
         int m_imageFormat = -1;

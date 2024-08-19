@@ -45,6 +45,7 @@ namespace DX
         bool CreateInstance();
         bool CreateDevice();
         bool CreateSwapChain();
+        bool CreateFrameBuffers();
 
         std::unique_ptr<Vulkan::Instance> m_instance;
         std::unique_ptr<Vulkan::Device> m_device;

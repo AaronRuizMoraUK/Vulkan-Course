@@ -54,6 +54,12 @@ namespace DX
             return false;
         }
 
+        if (!CreateFrameBuffers())
+        {
+            Terminate();
+            return false;
+        }
+
         return true;
     }
 
@@ -113,7 +119,6 @@ namespace DX
 
     bool Renderer::CreatePipeline()
     {
-        // Viewport
         const Math::Rectangle viewport(
             Math::Vector2(0.0f, 0.0f),
             Math::Vector2(m_swapChain->GetImageSize()));
@@ -123,6 +128,17 @@ namespace DX
         if (!m_pipeline->Initialize())
         {
             DX_LOG(Error, "Renderer", "Failed to create pipeline.");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Renderer::CreateFrameBuffers()
+    {
+        if (!m_swapChain->CreateFrameBuffers(m_pipeline->GetVkRenderPass()))
+        {
+            DX_LOG(Error, "Renderer", "Failed to create frame buffers for the swap chain.");
             return false;
         }
 

@@ -2,6 +2,7 @@
 
 #include <Renderer/Vulkan/Instance.h>
 #include <Renderer/Vulkan/Device.h>
+#include <Renderer/Vulkan/FrameBuffer.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -165,36 +166,6 @@ namespace Vulkan
                 return vkSurfaceCapabilities.currentExtent;
             }
         }
-
-        bool CreateVkImageView(VkDevice vkDevice, VkImage vkImage, VkFormat vkFormat, VkImageAspectFlags vkAspectFlags, VkImageView* vkImageViewOut)
-        {
-            VkImageViewCreateInfo vkImageViewCreateInfo = {};
-            vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            vkImageViewCreateInfo.pNext = nullptr;
-            vkImageViewCreateInfo.flags = 0;
-            vkImageViewCreateInfo.image = vkImage;
-            vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            vkImageViewCreateInfo.format = vkFormat;
-            vkImageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            vkImageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            vkImageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            vkImageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-            // With subresource range it specifies the part of the image to view
-            vkImageViewCreateInfo.subresourceRange.aspectMask = vkAspectFlags;
-            vkImageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-            vkImageViewCreateInfo.subresourceRange.levelCount = 1;
-            vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-            vkImageViewCreateInfo.subresourceRange.layerCount = 1;
-
-            if (vkCreateImageView(vkDevice, &vkImageViewCreateInfo, nullptr, vkImageViewOut) != VK_SUCCESS)
-            {
-                DX_LOG(Error, "Vulkan SwapChain", "Failed to create Vulkan Image View.");
-                return false;
-            }
-
-            return true;
-        }
     } // namespace Utils
 
     bool SwapChain::CheckSwapChainSupported(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
@@ -237,12 +208,7 @@ namespace Vulkan
     {
         DX_LOG(Info, "Vulkan SwapChain", "Terminating Vulkan SwapChain...");
 
-        std::for_each(m_swapChainImages.begin(), m_swapChainImages.end(),
-            [this](SwapChainImage& swapChainImage)
-            {
-                vkDestroyImageView(m_device->GetVkDevice(), swapChainImage.m_vkImageView, nullptr);
-            });
-        m_swapChainImages.clear();
+        DestroyFrameBuffers();
 
         vkDestroySwapchainKHR(m_device->GetVkDevice(), m_vkSwapChain, nullptr);
         m_vkSwapChain = nullptr;
@@ -256,6 +222,81 @@ namespace Vulkan
     const Math::Vector2Int& SwapChain::GetImageSize() const
     {
         return m_imageSize;
+    }
+
+    bool SwapChain::CreateFrameBuffers(VkRenderPass vkRenderPass)
+    {
+        DX_LOG(Info, "Vulkan SwapChain", "Creating Vulkan FrameBuffers for SwapChain...");
+
+        // Obtain the images that have been created as part of the swap chain.
+        // The vulkan images are obtained from the swap chain.
+        const std::vector<VkImage> vkSwapChainImages = [this]()
+            {
+                uint32_t imageCount = 0;
+                vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &imageCount, nullptr);
+
+                std::vector<VkImage> vkSwapChainImages(imageCount);
+                vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &imageCount, vkSwapChainImages.data());
+
+                return vkSwapChainImages;
+            }();
+
+        if (vkSwapChainImages.empty())
+        {
+            DX_LOG(Error, "Vulkan SwapChain", "No Vulkan SwapChain Images populated.");
+            return false;
+        }
+        else if (std::any_of(vkSwapChainImages.begin(), vkSwapChainImages.end(),
+            [](const VkImage& vkImage)
+            {
+                return vkImage == nullptr;
+            }))
+        {
+            DX_LOG(Error, "Vulkan SwapChain", "Failed to populate Vulkan SwapChain Images.");
+            return false;
+        }
+
+        std::vector<std::unique_ptr<FrameBuffer>> frameBuffers(vkSwapChainImages.size());
+        std::transform(vkSwapChainImages.begin(), vkSwapChainImages.end(), frameBuffers.begin(),
+            [this, vkRenderPass](VkImage vkImage) -> std::unique_ptr<FrameBuffer>
+            {
+                const Image colorImage = {
+                    .m_vkImage = vkImage,
+                    .m_vkFormat = m_imageFormat,
+                    .m_size = m_imageSize
+                };
+                const bool createDepthAttachment = false;
+        
+                auto frameBuffer = std::make_unique<FrameBuffer>(m_device, vkRenderPass, colorImage);
+        
+                if (!frameBuffer->Initialize(createDepthAttachment))
+                {
+                    return nullptr;
+                }
+        
+                return frameBuffer;
+            });
+
+        if (std::any_of(frameBuffers.begin(), frameBuffers.end(),
+            [](const std::unique_ptr<FrameBuffer>& frameBuffer)
+            {
+                return frameBuffer.get() == nullptr;
+            }))
+        {
+            DX_LOG(Error, "Vulkan SwapChain", "Failed to create Frame Buffers.");
+            return false;
+        }
+
+        m_frameBuffers = std::move(frameBuffers);
+
+        return true;
+    }
+
+    void SwapChain::DestroyFrameBuffers()
+    {
+        DX_LOG(Info, "Vulkan SwapChain", "Destroying Vulkan FrameBuffers from SwapChain...");
+
+        m_frameBuffers.clear();
     }
 
     bool SwapChain::CreateVkSwapChain()
@@ -286,9 +327,7 @@ namespace Vulkan
 
         // If queue families use different queues, then swap chain must let
         // its images be shared between families.
-        const auto& familyTypeToFamilyIndices = m_device->GetVkQueueFamilyInfo().m_familyTypeToFamilyIndices;
-        const std::unordered_set<uint32_t> uniqueFamilyIndicesSet(familyTypeToFamilyIndices.begin(), familyTypeToFamilyIndices.end());
-        const std::vector<uint32_t> uniqueFamilyIndices(uniqueFamilyIndicesSet.begin(), uniqueFamilyIndicesSet.end());
+        const std::vector<uint32_t>& uniqueFamilyIndices = m_device->GetQueueFamilyInfo().m_uniqueQueueFamilyIndices;
 
         DX_LOG(Verbose, "Vulkan SwapChain", "SwapChain Properties:");
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Size: %dx%d", vkImageExtent.width, vkImageExtent.height);
@@ -336,58 +375,6 @@ namespace Vulkan
         // Store recurrent swap chain properties
         m_imageFormat = vkSurfaceFormat.format;
         m_imageSize = Math::Vector2Int(vkImageExtent.width, vkImageExtent.height);
-
-        // Obtain the images that have been created as part of the swap chain.
-        // The vulkan images are obtained from the swap chain.
-        // The vulkan image views are created from the images.
-        m_swapChainImages = [this]()
-            {
-                uint32_t imageCount = 0;
-                vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &imageCount, nullptr);
-
-                std::vector<VkImage> vkSwapChainImages(imageCount);
-                vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &imageCount, vkSwapChainImages.data());
-
-                std::vector<VkImageView> vkSwapChainImageViews(imageCount);
-                std::transform(vkSwapChainImages.begin(), vkSwapChainImages.end(), vkSwapChainImageViews.begin(),
-                    [this](VkImage vkImage) -> VkImageView
-                    {
-                        if (VkImageView vkImageView = nullptr;
-                            Utils::CreateVkImageView(m_device->GetVkDevice(), vkImage,
-                                static_cast<VkFormat>(m_imageFormat), VK_IMAGE_ASPECT_COLOR_BIT, &vkImageView))
-                        {
-                            return vkImageView;
-                        }
-                        else
-                        {
-                            return nullptr;
-                        }
-                    });
-
-                std::vector<SwapChainImage> swapChainImages(imageCount);
-                std::transform(vkSwapChainImages.begin(), vkSwapChainImages.end(), vkSwapChainImageViews.begin(), swapChainImages.begin(),
-                    [](VkImage vkImage, VkImageView vkImageView) -> SwapChainImage
-                    {
-                        return { vkImage, vkImageView };
-                    });
-
-                return swapChainImages;
-            }();
-
-        if (m_swapChainImages.empty())
-        {
-            DX_LOG(Error, "Vulkan SwapChain", "No Vulkan SwapChain Images created.");
-            return false;
-        }
-        else if (std::any_of(m_swapChainImages.begin(), m_swapChainImages.end(),
-            [](const SwapChainImage& swapChainImage)
-            {
-                return swapChainImage.m_vkImage == nullptr || swapChainImage.m_vkImageView == nullptr;
-            }))
-        {
-            DX_LOG(Error, "Vulkan SwapChain", "Failed to create Vulkan SwapChain Images.");
-            return false;
-        }
 
         return true;
     }

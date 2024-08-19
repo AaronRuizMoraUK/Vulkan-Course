@@ -3,22 +3,17 @@
 #include <Math/Vector2.h>
 
 #include <vector>
+#include <memory>
 
 typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
 typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkSwapchainKHR_T* VkSwapchainKHR;
-typedef struct VkImage_T* VkImage;
-typedef struct VkImageView_T* VkImageView;
+typedef struct VkRenderPass_T* VkRenderPass;
 
 namespace Vulkan
 {
     class Device;
-
-    struct SwapChainImage
-    {
-        VkImage m_vkImage = nullptr;
-        VkImageView m_vkImageView = nullptr;
-    };
+    class FrameBuffer;
 
     // Manages the Vulkan SwapChain
     class SwapChain
@@ -38,6 +33,9 @@ namespace Vulkan
         int GetImageFormat() const;
         const Math::Vector2Int& GetImageSize() const;
 
+        bool CreateFrameBuffers(VkRenderPass vkRenderPass);
+        void DestroyFrameBuffers();
+
     private:
         Device* m_device = nullptr;
 
@@ -48,6 +46,8 @@ namespace Vulkan
 
         int m_imageFormat = -1;
         Math::Vector2Int m_imageSize = Math::Vector2Int(0);
-        std::vector<SwapChainImage> m_swapChainImages;
+
+    private:
+        std::vector<std::unique_ptr<FrameBuffer>> m_frameBuffers;
     };
 } // namespace Vulkan

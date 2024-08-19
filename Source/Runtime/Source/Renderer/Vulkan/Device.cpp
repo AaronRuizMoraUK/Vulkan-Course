@@ -16,7 +16,7 @@ namespace Vulkan
     // Utils to extract information and perform checks on Vulkan Physical Devices
     namespace Utils
     {
-        VkQueueFamilyInfo EnumerateVkQueueFamilies(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
+        QueueFamilyInfo EnumerateQueueFamilies(VkPhysicalDevice vkPhysicalDevice, VkSurfaceKHR vkSurface)
         {
             // Queue family properties of a Vulkan physical devices
             const std::vector<VkQueueFamilyProperties> queueFamilyProperties = [vkPhysicalDevice]()
@@ -30,8 +30,8 @@ namespace Vulkan
                     return queueFamilyProperties;
                 }();
 
-            VkQueueFamilyInfo vkQueueFamilyInfo;
-            for (int queueFamilyIndex = 0; queueFamilyIndex < queueFamilyProperties.size() && !vkQueueFamilyInfo.IsValid(); ++queueFamilyIndex)
+            QueueFamilyInfo queueFamilyInfo;
+            for (int queueFamilyIndex = 0; queueFamilyIndex < queueFamilyProperties.size() && !queueFamilyInfo.IsValid(); ++queueFamilyIndex)
             {
                 // ------------------
                 // Check Graphics
@@ -40,10 +40,10 @@ namespace Vulkan
                     queueFamilyProperties[queueFamilyIndex].queueCount > 0;
 
                 // If Graphics is supported and it's the first queue family found for it, assign it.
-                if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Graphics] < 0 &&
+                if (queueFamilyInfo.m_familyTypeToFamilyIndices[QueueFamilyType_Graphics] < 0 &&
                     queueFamilySupportsGraphics)
                 {
-                    vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Graphics] = queueFamilyIndex;
+                    queueFamilyInfo.m_familyTypeToFamilyIndices[QueueFamilyType_Graphics] = queueFamilyIndex;
                 }
 
                 // ------------------
@@ -53,10 +53,10 @@ namespace Vulkan
                     queueFamilyProperties[queueFamilyIndex].queueCount > 0;
 
                 // If Compute is supported and it's the first queue family found for it, assign it.
-                if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Compute] < 0 &&
+                if (queueFamilyInfo.m_familyTypeToFamilyIndices[QueueFamilyType_Compute] < 0 &&
                     queueFamilySupportsCompute)
                 {
-                    vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Compute] = queueFamilyIndex;
+                    queueFamilyInfo.m_familyTypeToFamilyIndices[QueueFamilyType_Compute] = queueFamilyIndex;
                 }
 
                 // ------------------
@@ -69,14 +69,18 @@ namespace Vulkan
                     queueFamilyProperties[queueFamilyIndex].queueCount > 0;
 
                 // If Presentation is supported and it's the first queue family found for it, assign it.
-                if (vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Presentation] < 0 &&
+                if (queueFamilyInfo.m_familyTypeToFamilyIndices[QueueFamilyType_Presentation] < 0 &&
                     queueFamilySupportsPresentation)
                 {
-                    vkQueueFamilyInfo.m_familyTypeToFamilyIndices[VkQueueFamilyType_Presentation] = queueFamilyIndex;
+                    queueFamilyInfo.m_familyTypeToFamilyIndices[QueueFamilyType_Presentation] = queueFamilyIndex;
                 }
             }
 
-            return vkQueueFamilyInfo;
+            // Make the list of unique family indices
+            const std::unordered_set<uint32_t> uniqueFamilyIndicesSet(queueFamilyInfo.m_familyTypeToFamilyIndices.begin(), queueFamilyInfo.m_familyTypeToFamilyIndices.end());
+            queueFamilyInfo.m_uniqueQueueFamilyIndices.assign(uniqueFamilyIndicesSet.begin(), uniqueFamilyIndicesSet.end());
+
+            return queueFamilyInfo;
         }
 
         bool VkDeviceExtensionsSupported(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions)
@@ -140,13 +144,13 @@ namespace Vulkan
             }
 
             // Check Queue Families support
-            const VkQueueFamilyInfo vkQueueFamilyInfo = EnumerateVkQueueFamilies(vkPhysicalDevice, vkSurface);
+            const QueueFamilyInfo queueFamilyInfo = EnumerateQueueFamilies(vkPhysicalDevice, vkSurface);
 
-            return vkQueueFamilyInfo.IsValid();
+            return queueFamilyInfo.IsValid();
         }
     } // namespace Utils
 
-    bool VkQueueFamilyInfo::IsValid() const
+    bool QueueFamilyInfo::IsValid() const
     {
         return std::all_of(m_familyTypeToFamilyIndices.begin(), m_familyTypeToFamilyIndices.end(),
             [](int index)
@@ -190,7 +194,7 @@ namespace Vulkan
 
         vkDestroyDevice(m_vkDevice, nullptr);
         m_vkDevice = nullptr;
-        m_vkQueueFamilyInfo = VkQueueFamilyInfo();
+        m_queueFamilyInfo = QueueFamilyInfo();
         m_vkQueues.fill(nullptr);
         m_vkPhysicalDevice = nullptr;
     }
@@ -210,9 +214,9 @@ namespace Vulkan
         return m_vkPhysicalDevice;
     }
 
-    const VkQueueFamilyInfo& Device::GetVkQueueFamilyInfo() const
+    const QueueFamilyInfo& Device::GetQueueFamilyInfo() const
     {
-        return m_vkQueueFamilyInfo;
+        return m_queueFamilyInfo;
     }
 
     bool Device::CreateVkDevice()
@@ -276,33 +280,29 @@ namespace Vulkan
         }
 
         // Queue Family information of the physical device.
-        m_vkQueueFamilyInfo = Utils::EnumerateVkQueueFamilies(m_vkPhysicalDevice, m_instance->GetVkSurface());
-        DX_ASSERT(m_vkQueueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
-
-        const float queuePriority = 1.0f; // 1.0f is highest priority, 0.0f is lowest priority.
+        m_queueFamilyInfo = Utils::EnumerateQueueFamilies(m_vkPhysicalDevice, m_instance->GetVkSurface());
+        DX_ASSERT(m_queueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
 
         // Populate the queues to create in the Vulkan device.
-        std::vector<VkDeviceQueueCreateInfo> deviceQueuesCreateInfo;
-        {
-            const std::unordered_set<uint32_t> uniqueFamilyIndices(
-                m_vkQueueFamilyInfo.m_familyTypeToFamilyIndices.begin(), 
-                m_vkQueueFamilyInfo.m_familyTypeToFamilyIndices.end());
-
-            deviceQueuesCreateInfo.reserve(uniqueFamilyIndices.size());
-            for (const uint32_t familyIndex : uniqueFamilyIndices)
+        std::vector<VkDeviceQueueCreateInfo> deviceQueuesCreateInfo(m_queueFamilyInfo.m_uniqueQueueFamilyIndices.size());
+        const float queuePriority = 1.0f; // 1.0f is highest priority, 0.0f is lowest priority.
+        std::transform(
+            m_queueFamilyInfo.m_uniqueQueueFamilyIndices.begin(),
+            m_queueFamilyInfo.m_uniqueQueueFamilyIndices.end(),
+            deviceQueuesCreateInfo.begin(),
+            [&queuePriority](uint32_t queueFamilyIndex)
             {
                 // Create a new queue for this family index.
                 VkDeviceQueueCreateInfo vkDeviceGraphicsQueueCreateInfo = {};
                 vkDeviceGraphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
                 vkDeviceGraphicsQueueCreateInfo.pNext = nullptr;
                 vkDeviceGraphicsQueueCreateInfo.flags = 0;
-                vkDeviceGraphicsQueueCreateInfo.queueFamilyIndex = familyIndex;
+                vkDeviceGraphicsQueueCreateInfo.queueFamilyIndex = queueFamilyIndex;
                 vkDeviceGraphicsQueueCreateInfo.queueCount = 1;
                 vkDeviceGraphicsQueueCreateInfo.pQueuePriorities = &queuePriority;
 
-                deviceQueuesCreateInfo.push_back(vkDeviceGraphicsQueueCreateInfo);
-            }
-        }
+                return vkDeviceGraphicsQueueCreateInfo;
+            });
 
         // Physical device features that the logical device will be using
         VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures = {};
@@ -326,11 +326,11 @@ namespace Vulkan
         }
 
         // Obtain the queues that have been created as part of the device.
-        for (int familyTypeIndex = 0; familyTypeIndex < VkQueueFamilyType_Count; ++familyTypeIndex)
+        for (int familyTypeIndex = 0; familyTypeIndex < QueueFamilyType_Count; ++familyTypeIndex)
         {
             vkGetDeviceQueue(
                 m_vkDevice, 
-                m_vkQueueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex],
+                m_queueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex],
                 0, 
                 &m_vkQueues[familyTypeIndex]);
             if (!m_vkQueues[familyTypeIndex])
