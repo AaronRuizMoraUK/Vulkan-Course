@@ -163,6 +163,7 @@ namespace Vulkan
         : m_instance(instance)
     {
         m_vkQueues.fill(nullptr);
+        m_vkCommandPools.fill(nullptr);
     }
 
     Device::~Device()
@@ -185,12 +186,24 @@ namespace Vulkan
             return false;
         }
 
+        if (!CreateVkCommandPools())
+        {
+            Terminate();
+            return false;
+        }
+
         return true;
     }
 
     void Device::Terminate()
     {
         DX_LOG(Info, "Vulkan Device", "Terminating Vulkan Device...");
+
+        for (auto vkCommandPool : m_vkCommandPools)
+        {
+            vkDestroyCommandPool(m_vkDevice, vkCommandPool, nullptr);
+        }
+        m_vkCommandPools.fill(nullptr);
 
         vkDestroyDevice(m_vkDevice, nullptr);
         m_vkDevice = nullptr;
@@ -212,6 +225,16 @@ namespace Vulkan
     VkPhysicalDevice Device::GetVkPhysicalDevice()
     {
         return m_vkPhysicalDevice;
+    }
+
+    VkQueue Device::GetVkQueue(QueueFamilyType queueFamilyType)
+    {
+        return m_vkQueues[queueFamilyType];
+    }
+
+    VkCommandPool Device::GetVkCommandPool(QueueFamilyType queueFamilyType)
+    {
+        return m_vkCommandPools[queueFamilyType];
     }
 
     const QueueFamilyInfo& Device::GetQueueFamilyInfo() const
@@ -326,16 +349,38 @@ namespace Vulkan
         }
 
         // Obtain the queues that have been created as part of the device.
-        for (int familyTypeIndex = 0; familyTypeIndex < QueueFamilyType_Count; ++familyTypeIndex)
+        // Different family types might use the same queue family index.
+        for (int familyType = 0; familyType < QueueFamilyType_Count; ++familyType)
         {
             vkGetDeviceQueue(
                 m_vkDevice, 
-                m_queueFamilyInfo.m_familyTypeToFamilyIndices[familyTypeIndex],
+                m_queueFamilyInfo.m_familyTypeToFamilyIndices[familyType],
                 0, 
-                &m_vkQueues[familyTypeIndex]);
-            if (!m_vkQueues[familyTypeIndex])
+                &m_vkQueues[familyType]);
+            if (!m_vkQueues[familyType])
             {
                 DX_LOG(Error, "Vulkan Device", "Failed to obtain queue from Vulkan device.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool Device::CreateVkCommandPools()
+    {
+        // Create one command pool for each queue family type.
+        for (int familyType = 0; familyType < QueueFamilyType_Count; ++familyType)
+        {
+            VkCommandPoolCreateInfo vkCommandPoolCreateInfo = {};
+            vkCommandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+            vkCommandPoolCreateInfo.pNext = nullptr;
+            vkCommandPoolCreateInfo.flags = 0;
+            vkCommandPoolCreateInfo.queueFamilyIndex = m_queueFamilyInfo.m_familyTypeToFamilyIndices[familyType];
+
+            if (vkCreateCommandPool(m_vkDevice, &vkCommandPoolCreateInfo, nullptr, &m_vkCommandPools[familyType]) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Vulkan Device", "Failed to create Vulkan command pool.");
                 return false;
             }
         }

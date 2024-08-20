@@ -60,6 +60,12 @@ namespace DX
             return false;
         }
 
+        if (!CreateCommandBuffers())
+        {
+            Terminate();
+            return false;
+        }
+
         return true;
     }
 
@@ -139,6 +145,17 @@ namespace DX
         if (!m_swapChain->CreateFrameBuffers(m_pipeline->GetVkRenderPass()))
         {
             DX_LOG(Error, "Renderer", "Failed to create frame buffers for the swap chain.");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Renderer::CreateCommandBuffers()
+    {
+        if (!m_swapChain->CreateCommandBuffers())
+        {
+            DX_LOG(Error, "Renderer", "Failed to create command buffers for the swap chain's frame buffers.");
             return false;
         }
 

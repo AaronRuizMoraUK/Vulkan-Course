@@ -14,6 +14,7 @@ namespace Vulkan
 {
     class Device;
     class FrameBuffer;
+    class CommandBuffer;
 
     // Manages the Vulkan SwapChain
     class SwapChain
@@ -30,11 +31,15 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
+        uint32_t GetImageCount() const;
         int GetImageFormat() const;
         const Math::Vector2Int& GetImageSize() const;
 
         bool CreateFrameBuffers(VkRenderPass vkRenderPass);
         void DestroyFrameBuffers();
+
+        bool CreateCommandBuffers();
+        void DestroyCommandBuffers();
 
     private:
         Device* m_device = nullptr;
@@ -44,10 +49,15 @@ namespace Vulkan
 
         VkSwapchainKHR m_vkSwapChain = nullptr;
 
+        uint32_t m_imageCount = 0;
         int m_imageFormat = -1;
         Math::Vector2Int m_imageSize = Math::Vector2Int(0);
 
     private:
+        // A frame buffer for drawing into each swap chain image
         std::vector<std::unique_ptr<FrameBuffer>> m_frameBuffers;
+
+        // A command buffer for sending commands to each frame buffer
+        std::vector<std::unique_ptr<CommandBuffer>> m_commandBuffers;
     };
 } // namespace Vulkan

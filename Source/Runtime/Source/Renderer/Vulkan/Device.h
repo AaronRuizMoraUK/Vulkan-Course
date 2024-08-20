@@ -6,6 +6,7 @@
 typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkDevice_T* VkDevice;
 typedef struct VkQueue_T* VkQueue;
+typedef struct VkCommandPool_T* VkCommandPool;
 
 namespace Vulkan
 {
@@ -56,6 +57,8 @@ namespace Vulkan
         Instance* GetInstance();
         VkDevice GetVkDevice();
         VkPhysicalDevice GetVkPhysicalDevice();
+        VkQueue GetVkQueue(QueueFamilyType queueFamilyType);
+        VkCommandPool GetVkCommandPool(QueueFamilyType queueFamilyType);
 
         const QueueFamilyInfo& GetQueueFamilyInfo() const;
 
@@ -64,10 +67,12 @@ namespace Vulkan
 
     private:
         bool CreateVkDevice();
+        bool CreateVkCommandPools();
 
         VkPhysicalDevice m_vkPhysicalDevice = nullptr;
         QueueFamilyInfo m_queueFamilyInfo;
         VkDevice m_vkDevice = nullptr;
         std::array<VkQueue, QueueFamilyType_Count> m_vkQueues;
+        std::array<VkCommandPool, QueueFamilyType_Count> m_vkCommandPools;
     };
 } // namespace Vulkan
