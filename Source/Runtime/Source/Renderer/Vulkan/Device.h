@@ -54,6 +54,9 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
+        // Wait until no actions being run on device before destroying.
+        void WaitUntilIdle();
+
         Instance* GetInstance();
         VkDevice GetVkDevice();
         VkPhysicalDevice GetVkPhysicalDevice();

@@ -212,6 +212,12 @@ namespace Vulkan
         m_vkPhysicalDevice = nullptr;
     }
 
+    void Device::WaitUntilIdle()
+    {
+        // Wait until all the commands in the queues have finished executing.
+        vkDeviceWaitIdle(m_vkDevice);
+    }
+
     Instance* Device::GetInstance()
     {
         return m_instance;

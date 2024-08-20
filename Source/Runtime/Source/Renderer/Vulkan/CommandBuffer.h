@@ -25,6 +25,8 @@ namespace Vulkan
         bool Initialize(bool createDepthAttachment = false);
         void Terminate();
 
+        VkCommandBuffer GetVkCommandBuffer();
+
         // -----------------------------------------------------------------------------
         // Call the following functions asynchronously from a thread to record commands.
         // -----------------------------------------------------------------------------

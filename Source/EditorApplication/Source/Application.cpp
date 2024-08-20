@@ -62,9 +62,7 @@ namespace DX
             // ------
             // Render
             // ------
-            //m_renderer->Render();
-
-            //m_renderer->Present();
+            m_renderer->Render();
         }
     }
 

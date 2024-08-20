@@ -252,6 +252,11 @@ namespace Vulkan
             : nullptr;
     }
 
+    VkSwapchainKHR SwapChain::GetVkSwapChain()
+    {
+        return m_vkSwapChain;
+    }
+
     bool SwapChain::CreateVkSwapChain()
     {
         const Utils::VkSwapChainInfo vkSwapChainInfo = 

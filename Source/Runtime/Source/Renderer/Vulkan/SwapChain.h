@@ -41,6 +41,8 @@ namespace Vulkan
         CommandBuffer* GetCommandBuffer(uint32_t imageIndex);
         FrameBuffer* GetFrameBuffer(uint32_t imageIndex);
 
+        VkSwapchainKHR GetVkSwapChain();
+
     private:
         Device* m_device = nullptr;
 

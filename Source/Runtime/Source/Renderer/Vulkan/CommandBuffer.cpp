@@ -48,17 +48,21 @@ namespace Vulkan
         m_vkCommandBuffer = nullptr;
     }
 
+    VkCommandBuffer CommandBuffer::GetVkCommandBuffer()
+    {
+        return m_vkCommandBuffer;
+    }
+
     bool CommandBuffer::Begin()
     {
         VkCommandBufferBeginInfo bufferBeginInfo = {};
         bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         bufferBeginInfo.pNext = nullptr;
-        // About VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
-        // If the cmd buffer is already in the queue, allow to submit the same cmd buffer again to the queue.
-        // In other words, cmd buffer can be resubmitted when it has already been submitted and is awaiting execution.
-        // It needs to guarantee that the command buffer hasn't changed while being executed it by the queue.
-        // This is a temporary flag we are using for convenience.
-        bufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+        // About VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT flag
+        // When used, if the cmd buffer is already in the queue, this allows to submit the same cmd buffer again to the queue.
+        // In other words, cmd buffer can be resubmitted when it has already been submitted and is awaiting execution or executing.
+        // It needs to guarantee that the command buffer doesn't changed while being executed it by the queue.
+        bufferBeginInfo.flags = 0;
         bufferBeginInfo.pInheritanceInfo = nullptr;
 
         // Start recording commands to command buffer!

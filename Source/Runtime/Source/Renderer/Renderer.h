@@ -3,7 +3,11 @@
 #include <Window/Window.h>
 #include <GenericId/GenericId.h>
 
+#include <array>
 #include <memory>
+
+typedef struct VkSemaphore_T* VkSemaphore;
+typedef struct VkFence_T* VkFence;
 
 namespace Vulkan
 {
@@ -34,8 +38,7 @@ namespace DX
 
         Window* GetWindow();
 
-        //void Render();
-        //void Present();
+        void Render();
 
     protected:
         void RecordCommands();
@@ -58,5 +61,27 @@ namespace DX
         bool CreateFrameBuffers();
 
         std::unique_ptr<Vulkan::Pipeline> m_pipeline;
+
+    private:
+        // ---------------------------
+        // Synchronization
+        // TODO: Move out of renderer. Maybe to SwapChain class.
+        bool CreateSynchronisation();
+
+        // MaxFrameDraws needs to be lower than number of images in swap chain,
+        // that way it'll block until there are images available for drawing and
+        // won't affect the one being presented.
+        static const int MaxFrameDraws = 2; 
+        int m_currentFrame = 0;
+
+        // Used to know when the swap chain image is ready for drawing.
+        std::array<VkSemaphore, MaxFrameDraws> m_vkImageAvailableSemaphores;
+        // Used to know when the execution of the command buffer in the
+        // queue (rendering) has finished and therefore can be presented
+        // in the swap chain image.
+        std::array<VkSemaphore, MaxFrameDraws> m_vkRenderFinishedSemaphores;
+        // Used to know when a render frame hasn't finished and wait until it does.
+        // It protected render function from doing more than MaxFrameDraws renders.
+        std::array<VkFence, MaxFrameDraws> m_vkRenderFences;
     };
 } // namespace DX
