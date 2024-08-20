@@ -61,12 +61,6 @@ namespace DX
             return false;
         }
 
-        if (!CreateCommandBuffers())
-        {
-            Terminate();
-            return false;
-        }
-
         // Pre-record the commands in all command buffers of the swap chain
         // TODO: to be removed and generate the command to only the command buffer
         //       of the current frame buffer being rendered to.
@@ -174,17 +168,6 @@ namespace DX
         if (!m_swapChain->CreateFrameBuffers(m_pipeline->GetVkRenderPass()))
         {
             DX_LOG(Error, "Renderer", "Failed to create frame buffers for the swap chain.");
-            return false;
-        }
-
-        return true;
-    }
-
-    bool Renderer::CreateCommandBuffers()
-    {
-        if (!m_swapChain->CreateCommandBuffers())
-        {
-            DX_LOG(Error, "Renderer", "Failed to create command buffers for the swap chain's frame buffers.");
             return false;
         }
 

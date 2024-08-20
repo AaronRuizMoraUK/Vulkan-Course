@@ -56,7 +56,6 @@ namespace DX
     private:
         bool CreatePipeline();
         bool CreateFrameBuffers();
-        bool CreateCommandBuffers();
 
         std::unique_ptr<Vulkan::Pipeline> m_pipeline;
     };

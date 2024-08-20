@@ -202,6 +202,12 @@ namespace Vulkan
             return false;
         }
 
+        if (!CreateCommandBuffers())
+        {
+            Terminate();
+            return false;
+        }
+
         return true;
     }
 
@@ -209,9 +215,9 @@ namespace Vulkan
     {
         DX_LOG(Info, "Vulkan SwapChain", "Terminating Vulkan SwapChain...");
 
-        DestroyCommandBuffers();
-
         DestroyFrameBuffers();
+
+        m_commandBuffers.clear();
 
         vkDestroySwapchainKHR(m_device->GetVkDevice(), m_vkSwapChain, nullptr);
         m_vkSwapChain = nullptr;
@@ -327,6 +333,25 @@ namespace Vulkan
         return true;
     }
 
+    bool SwapChain::CreateCommandBuffers()
+    {
+        // Create graphics command buffers for all frame buffers of the swap chain.
+        // That's one command buffer for each image of the swap chain.
+        m_commandBuffers.resize(m_imageCount);
+        for (auto& commandBuffer : m_commandBuffers)
+        {
+            commandBuffer = std::make_unique<CommandBuffer>(m_device, m_device->GetVkCommandPool(QueueFamilyType_Graphics));
+
+            if (!commandBuffer->Initialize())
+            {
+                DX_LOG(Error, "Vulkan SwapChain", "Failed to create CommandBuffer.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     bool SwapChain::CreateFrameBuffers(VkRenderPass vkRenderPass)
     {
         DX_LOG(Info, "Vulkan SwapChain", "Creating Vulkan FrameBuffers for SwapChain...");
@@ -379,34 +404,5 @@ namespace Vulkan
         DX_LOG(Info, "Vulkan SwapChain", "Destroying Vulkan FrameBuffers from SwapChain...");
 
         m_frameBuffers.clear();
-    }
-
-    bool SwapChain::CreateCommandBuffers()
-    {
-        DX_LOG(Info, "Vulkan SwapChain", "Creating Vulkan CommandBuffers for SwapChain's FrameBuffers...");
-
-        // Create graphics command buffers for all frame buffers of the swap chain
-        std::vector<std::unique_ptr<CommandBuffer>> commandBuffers(m_frameBuffers.size());
-        for (auto& commandBuffer : commandBuffers)
-        {
-            commandBuffer = std::make_unique<CommandBuffer>(m_device, m_device->GetVkCommandPool(QueueFamilyType_Graphics));
-
-            if (!commandBuffer->Initialize())
-            {
-                DX_LOG(Error, "Vulkan SwapChain", "Failed to create CommandBuffer.");
-                return false;
-            }
-        }
-
-        m_commandBuffers = std::move(commandBuffers);
-
-        return true;
-    }
-
-    void SwapChain::DestroyCommandBuffers()
-    {
-        DX_LOG(Info, "Vulkan SwapChain", "Destroying Vulkan CommandBuffers...");
-
-        m_commandBuffers.clear();
     }
 } // namespace Vulkan
