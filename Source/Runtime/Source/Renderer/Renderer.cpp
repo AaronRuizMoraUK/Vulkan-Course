@@ -4,6 +4,7 @@
 #include <Renderer/Vulkan/Device.h>
 #include <Renderer/Vulkan/SwapChain.h>
 #include <Renderer/Vulkan/Pipeline.h>
+#include <Renderer/Vulkan/CommandBuffer.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -66,6 +67,11 @@ namespace DX
             return false;
         }
 
+        // Pre-record the commands in all command buffers of the swap chain
+        // TODO: to be removed and generate the command to only the command buffer
+        //       of the current frame buffer being rendered to.
+        RecordCommands();
+
         return true;
     }
 
@@ -82,6 +88,29 @@ namespace DX
     Window* Renderer::GetWindow()
     {
         return m_window;
+    }
+
+    void Renderer::RecordCommands()
+    {
+        const uint32_t imageCount = m_swapChain->GetImageCount();
+        for (uint32_t imageIndex = 0; imageIndex < imageCount; ++imageIndex)
+        {
+            auto* commandBuffer = m_swapChain->GetCommandBuffer(imageIndex);
+
+            if (commandBuffer->Begin())
+            {
+                commandBuffer->BeginRenderPass(
+                    m_swapChain->GetFrameBuffer(imageIndex), 
+                    Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f));
+                {
+                    commandBuffer->BindPipeline(m_pipeline.get());
+
+                    commandBuffer->Draw(3);
+                }
+                commandBuffer->EndRenderPass();
+                commandBuffer->End();
+            }
+        }
     }
 
     bool Renderer::CreateInstance()

@@ -98,6 +98,11 @@ namespace Vulkan
         return m_vkRenderPass;
     }
 
+    VkPipeline Pipeline::GetVkPipeline()
+    {
+        return m_vkPipeline;
+    }
+
     bool Pipeline::CreateVkRenderPass()
     {
         // About image layouts in attachments
@@ -478,7 +483,7 @@ namespace Vulkan
 
             // TODO: Pipeline Depth Stencil State
 
-            // Finally, create the pipeline
+            // Finally, create the graphics pipeline
             VkGraphicsPipelineCreateInfo vkGraphicsPipelineCreateInfo;
             vkGraphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
             vkGraphicsPipelineCreateInfo.pNext = nullptr;

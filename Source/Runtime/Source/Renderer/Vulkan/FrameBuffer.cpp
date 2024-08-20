@@ -154,6 +154,26 @@ namespace Vulkan
         // Color image was passed to FrameBuffer, so it's not its responsibility to destroy it.
     }
 
+    VkRenderPass FrameBuffer::GetVkRenderPass()
+    {
+        return m_vkRenderPass;
+    }
+
+    VkFramebuffer FrameBuffer::GetVkFrameBuffer()
+    {
+        return m_vkFrameBuffer;
+    }
+
+    const Image& FrameBuffer::GetColorImage() const
+    {
+        return m_colorImage;
+    }
+
+    const Image& FrameBuffer::GetDepthImage() const
+    {
+        return m_depthImage;
+    }
+
     bool FrameBuffer::CreateColorAttachment()
     {
         if (!Utils::CreateVkImageView(m_device->GetVkDevice(), m_colorImage.m_vkImage,

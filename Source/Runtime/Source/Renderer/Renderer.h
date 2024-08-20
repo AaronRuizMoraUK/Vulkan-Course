@@ -37,6 +37,9 @@ namespace DX
         //void Render();
         //void Present();
 
+    protected:
+        void RecordCommands();
+
     private:
         RendererId m_rendererId;
         Window* m_window = nullptr;

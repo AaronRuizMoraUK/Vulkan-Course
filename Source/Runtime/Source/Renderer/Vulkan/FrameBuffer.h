@@ -23,6 +23,12 @@ namespace Vulkan
         bool Initialize(bool createDepthAttachment = false);
         void Terminate();
 
+        VkRenderPass GetVkRenderPass();
+        VkFramebuffer GetVkFrameBuffer();
+
+        const Image& GetColorImage() const;
+        const Image& GetDepthImage() const;
+
     private:
         Device* m_device = nullptr;
         VkRenderPass m_vkRenderPass = nullptr;

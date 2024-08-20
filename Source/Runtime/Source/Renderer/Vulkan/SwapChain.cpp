@@ -217,11 +217,6 @@ namespace Vulkan
         m_vkSwapChain = nullptr;
     }
 
-    uint32_t SwapChain::GetImageCount() const
-    {
-        return m_imageCount;
-    }
-
     int SwapChain::GetImageFormat() const
     {
         return m_imageFormat;
@@ -230,6 +225,25 @@ namespace Vulkan
     const Math::Vector2Int& SwapChain::GetImageSize() const
     {
         return m_imageSize;
+    }
+
+    uint32_t SwapChain::GetImageCount() const
+    {
+        return m_imageCount;
+    }
+
+    FrameBuffer* SwapChain::GetFrameBuffer(uint32_t imageIndex)
+    {
+        return (imageIndex < m_frameBuffers.size())
+            ? m_frameBuffers[imageIndex].get()
+            : nullptr;
+    }
+
+    CommandBuffer* SwapChain::GetCommandBuffer(uint32_t imageIndex)
+    {
+        return (imageIndex < m_commandBuffers.size())
+            ? m_commandBuffers[imageIndex].get()
+            : nullptr;
     }
 
     bool SwapChain::CreateVkSwapChain()
@@ -371,6 +385,7 @@ namespace Vulkan
     {
         DX_LOG(Info, "Vulkan SwapChain", "Creating Vulkan CommandBuffers for SwapChain's FrameBuffers...");
 
+        // Create graphics command buffers for all frame buffers of the swap chain
         std::vector<std::unique_ptr<CommandBuffer>> commandBuffers(m_frameBuffers.size());
         for (auto& commandBuffer : commandBuffers)
         {

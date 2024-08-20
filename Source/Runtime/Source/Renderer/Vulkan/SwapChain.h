@@ -31,15 +31,17 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
-        uint32_t GetImageCount() const;
-        int GetImageFormat() const;
-        const Math::Vector2Int& GetImageSize() const;
-
         bool CreateFrameBuffers(VkRenderPass vkRenderPass);
         void DestroyFrameBuffers();
 
         bool CreateCommandBuffers();
         void DestroyCommandBuffers();
+
+        int GetImageFormat() const;
+        const Math::Vector2Int& GetImageSize() const;
+        uint32_t GetImageCount() const;
+        FrameBuffer* GetFrameBuffer(uint32_t imageIndex);
+        CommandBuffer* GetCommandBuffer(uint32_t imageIndex);
 
     private:
         Device* m_device = nullptr;
