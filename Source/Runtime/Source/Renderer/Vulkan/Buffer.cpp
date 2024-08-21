@@ -135,7 +135,7 @@ namespace Vulkan
             vkGetBufferMemoryRequirements(m_device->GetVkDevice(), m_vkBuffer, &vkMemoryRequirements);
 
             // Memory properties we want:
-            // - VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: visible to the CPU.
+            // - VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: visible to the CPU (not optimal for GPU performance)
             // - VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: it causes the data (after being mapped) to be placed straight into
             // the buffer. This removes the need to flush (vkFlushMappedMemoryRanges) and invalidate (vkInvalidateMappedMemoryRanges)
             // the memory after doing map-memcpy-unmap into the buffer.
