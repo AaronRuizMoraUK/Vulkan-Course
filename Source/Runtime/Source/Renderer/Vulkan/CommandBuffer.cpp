@@ -4,6 +4,7 @@
 #include <Renderer/Vulkan/FrameBuffer.h>
 #include <Renderer/Vulkan/Pipeline.h>
 #include <Renderer/Vulkan/Buffer.h>
+#include <Renderer/Vulkan/Utils.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -54,16 +55,12 @@ namespace Vulkan
         return m_vkCommandBuffer;
     }
 
-    bool CommandBuffer::Begin()
+    bool CommandBuffer::Begin(CommandBufferUsageFlags flags)
     {
         VkCommandBufferBeginInfo bufferBeginInfo = {};
         bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         bufferBeginInfo.pNext = nullptr;
-        // About VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT flag
-        // When used, if the cmd buffer is already in the queue, this allows to submit the same cmd buffer again to the queue.
-        // In other words, cmd buffer can be resubmitted when it has already been submitted and is awaiting execution or executing.
-        // It needs to guarantee that the command buffer doesn't changed while being executed it by the queue.
-        bufferBeginInfo.flags = 0;
+        bufferBeginInfo.flags = ToVkCommandBufferUsageFlags(flags);
         bufferBeginInfo.pInheritanceInfo = nullptr;
 
         // Start recording commands to command buffer!
@@ -181,6 +178,18 @@ namespace Vulkan
         uint32_t instanceCount, uint32_t firstInstance)
     {
         vkCmdDrawIndexed(m_vkCommandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    }
+
+    void CommandBuffer::CopyBuffer(VkBuffer vkDstBuffer, VkBuffer vkSrcBuffer, size_t bufferSize)
+    {
+        // Region of data to copy from and to
+        const VkBufferCopy vkBufferCopyRegion = {
+            .srcOffset = 0,
+            .dstOffset = 0,
+            .size = bufferSize
+        };
+
+        vkCmdCopyBuffer(m_vkCommandBuffer, vkSrcBuffer, vkDstBuffer, 1, &vkBufferCopyRegion);
     }
 
     bool CommandBuffer::AllocateVkCommandBuffer()

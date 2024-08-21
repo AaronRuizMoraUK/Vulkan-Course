@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Renderer/Vulkan/CommandBufferEnums.h>
+
 #include <Math/Color.h>
 
 #include <optional>
@@ -7,6 +9,7 @@
 
 typedef struct VkCommandBuffer_T* VkCommandBuffer;
 typedef struct VkCommandPool_T* VkCommandPool;
+typedef struct VkBuffer_T* VkBuffer;
 
 namespace Vulkan
 {
@@ -33,7 +36,7 @@ namespace Vulkan
         // -----------------------------------------------------------------------------
         // These functions can be called asynchronously from a thread to record commands.
         // -----------------------------------------------------------------------------
-        bool Begin(); // Call this first before the command calls.
+        bool Begin(CommandBufferUsageFlags flags = 0); // Call this first before the command calls.
         void End();   // Call this last after all the command calls.
 
         // -- Graphics commands --
@@ -54,7 +57,7 @@ namespace Vulkan
 
         // -- Transfer commands --
 
-        void CopyBuffer();
+        void CopyBuffer(VkBuffer vkDstBuffer, VkBuffer vkSrcBuffer, size_t bufferSize);
 
     private:
         Device* m_device = nullptr;
