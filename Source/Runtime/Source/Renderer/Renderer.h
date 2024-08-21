@@ -5,6 +5,7 @@
 
 #include <array>
 #include <memory>
+#include <unordered_set>
 
 typedef struct VkSemaphore_T* VkSemaphore;
 typedef struct VkFence_T* VkFence;
@@ -19,6 +20,8 @@ namespace Vulkan
 
 namespace DX
 {
+    class Object;
+
     using RendererId = GenericId<struct RendererIdTag>;
 
     // Manages the render device, swap chain, frame buffer and scene.
@@ -37,15 +40,24 @@ namespace DX
         RendererId GetId() const { return m_rendererId; }
 
         Window* GetWindow();
+        Vulkan::Device* GetDevice();
 
         void Render();
 
-    protected:
+        // Wait until no actions being run on device before destroying.
+        void WaitUntilIdle();
+
+        void AddObject(Object* object);
+        void RemoveObject(Object* object);
+
+        // TODO: Remove and generate commands every frame inside Render for the current frame
         void RecordCommands();
 
     private:
         RendererId m_rendererId;
         Window* m_window = nullptr;
+
+        std::unordered_set<Object*> m_objects;
 
     private:
         bool CreateInstance();

@@ -1,5 +1,6 @@
 #include <Renderer/Renderer.h>
 
+#include <Renderer/Object.h>
 #include <Renderer/Vulkan/Instance.h>
 #include <Renderer/Vulkan/Device.h>
 #include <Renderer/Vulkan/SwapChain.h>
@@ -72,23 +73,13 @@ namespace DX
             return false;
         }
 
-        // Pre-record the commands in all command buffers of the swap chain
-        // TODO: to be removed and generate the command to only the command buffer
-        //       of the current frame buffer being rendered to.
-        RecordCommands();
-
         return true;
     }
 
     void Renderer::Terminate()
     {
-        DX_LOG(Info, "Renderer", "Waiting until device is idling...");
-
-        if (m_device)
-        {
-            // Necessary before destroying synchronization data
-            m_device->WaitUntilIdle();
-        }
+        // Necessary before destroying synchronization data
+        WaitUntilIdle();
 
         DX_LOG(Info, "Renderer", "Terminating Renderer...");
 
@@ -114,6 +105,11 @@ namespace DX
     Window* Renderer::GetWindow()
     {
         return m_window;
+    }
+
+    Vulkan::Device* Renderer::GetDevice()
+    {
+        return m_device.get();
     }
 
     void Renderer::Render()
@@ -206,6 +202,24 @@ namespace DX
         m_currentFrame = (m_currentFrame + 1) % MaxFrameDraws;
     }
 
+    void Renderer::WaitUntilIdle()
+    {
+        if (m_device)
+        {
+            m_device->WaitUntilIdle();
+        }
+    }
+
+    void Renderer::AddObject(Object* object)
+    {
+        m_objects.insert(object);
+    }
+
+    void Renderer::RemoveObject(Object* object)
+    {
+        m_objects.erase(object);
+    }
+
     void Renderer::RecordCommands()
     {
         const uint32_t imageCount = m_swapChain->GetImageCount();
@@ -218,11 +232,19 @@ namespace DX
                 commandBuffer->BeginRenderPass(
                     m_swapChain->GetFrameBuffer(imageIndex), 
                     Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f));
-                {
-                    commandBuffer->BindPipeline(m_pipeline.get());
 
-                    commandBuffer->Draw(3);
+                commandBuffer->BindPipeline(m_pipeline.get());
+
+                for (auto* object : m_objects)
+                {
+                    // Bind Vertex and Index Buffers
+                    commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });
+                    commandBuffer->BindIndexBuffer(object->GetIndexBuffer().get());
+
+                    // Draw
+                    commandBuffer->DrawIndexed(object->GetIndexCount());
                 }
+
                 commandBuffer->EndRenderPass();
                 commandBuffer->End();
             }

@@ -32,5 +32,6 @@ namespace DX
         Renderer* m_renderer = nullptr;
 
         std::unique_ptr<Camera> m_camera;
+        std::vector<std::unique_ptr<Object>> m_objects;
     };
 }

@@ -288,9 +288,9 @@ namespace Vulkan
             Device* m_device = nullptr;
         };
 
+        // TODO: Pass all info to the Pipeline class, rather than generate them here.
+
         // Create Shader Modules
-        // 
-        // TODO: Pass them to the Pipeline class, rather than generate them here.
         // 
         // Once the pipeline object is created it will contain the shaders.
         // This means the shader modules will no longer be needed and need to be destroyed.
@@ -356,14 +356,25 @@ namespace Vulkan
             vkPipelineShaderStagesCreateInfo[1].pSpecializationInfo = nullptr;
 
             // Pipeline Vertex Input State (Input Layout)
+            const VkVertexInputBindingDescription vkVertexInputBindingDesc = {
+                .binding = 0, // Stream
+                .stride = (3 + 4) * 4, // sizeof(VertexPC)
+                .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+            };
+
+            const std::vector<VkVertexInputAttributeDescription> vkVertexInputAttributesDesc = {
+                {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},
+                {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = 3 * 4 /*offsetof(VertexPC, m_color)*/}
+            };
+
             VkPipelineVertexInputStateCreateInfo vkPipelineVertexInputStateCreateInfo = {};
             vkPipelineVertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
             vkPipelineVertexInputStateCreateInfo.pNext = nullptr;
             vkPipelineVertexInputStateCreateInfo.flags = 0;
-            vkPipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 0;
-            vkPipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = nullptr; // Info about data spacing, stride info
-            vkPipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = 0;
-            vkPipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = nullptr; // Info about data format and where to bind to/from
+            vkPipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 1;
+            vkPipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = &vkVertexInputBindingDesc; // Info about data spacing, stride info
+            vkPipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(vkVertexInputAttributesDesc.size());
+            vkPipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = vkVertexInputAttributesDesc.data(); // Info about data format and where to bind to/from
 
             // Pipeline Input Assembly State (Primitive Topology)
             VkPipelineInputAssemblyStateCreateInfo vkPipelineInputAssemblyStateCreateInfo = {};
@@ -371,7 +382,7 @@ namespace Vulkan
             vkPipelineInputAssemblyStateCreateInfo.pNext = nullptr;
             vkPipelineInputAssemblyStateCreateInfo.flags = 0;
             vkPipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-            vkPipelineInputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE; // Allow overriding of "strip" topology to start new primitives
+            vkPipelineInputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE; // When true it allows overriding of "strip" topology to start new primitives
 
             // Viewport & Scissor State
             // Number of viewports and scissors must match in Vulkan.

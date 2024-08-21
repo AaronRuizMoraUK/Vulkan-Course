@@ -3,12 +3,24 @@
 #include <Assets/AssetManager.h>
 #include <Window/WindowManager.h>
 #include <Renderer/RendererManager.h>
+#include <Renderer/Object.h>
 #include <Camera/Camera.h>
 
 #include <Math/Transform.h>
 
 namespace DX
 {
+    namespace Triangle
+    {
+        static const std::vector<VertexPC> VertexData = {
+            { Math::Vector3Packed({ 0.4f,-0.4f, 0.0f}), Math::ColorPacked({1.0f, 0.0f, 0.0f, 1.0f}) },
+            { Math::Vector3Packed({ 0.4f, 0.4f, 0.0f}), Math::ColorPacked({0.0f, 1.0f, 0.0f, 1.0f}) },
+            { Math::Vector3Packed({-0.4f, 0.4f, 0.0f}), Math::ColorPacked({0.0f, 0.0f, 1.0f, 1.0f}) }
+        };
+
+        static const std::vector<Index> IndexData = { 0, 1, 2 };
+    }
+
     Application::Application() = default;
 
     Application::~Application() = default;
@@ -36,6 +48,19 @@ namespace DX
 
         // Camera
         m_camera = std::make_unique<Camera>(Math::Vector3(0.0f, 2.0f, -2.0f), Math::Vector3(0.0f, 1.0f, 0.0f));
+
+        // Prepare render objects
+        m_objects.push_back(std::make_unique<SimpleObject>(
+            Math::Transform::CreateIdentity(), Triangle::VertexData, Triangle::IndexData));
+        m_objects.push_back(std::make_unique<Cube>(
+            Math::Transform::CreateIdentity(), Math::Vector3(0.2f)));
+
+        std::ranges::for_each(m_objects, [this](auto& object) { m_renderer->AddObject(object.get()); });
+
+        // Pre-record the commands in all command buffers of the swap chain
+        // TODO: to be removed and generate instead the commands for the command buffer
+        //       of the current frame buffer being rendered to.
+        m_renderer->RecordCommands();
 
         return true;
     }
@@ -68,6 +93,15 @@ namespace DX
 
     void Application::Terminate()
     {
+        // Necessary before destroying render objects
+        if (m_renderer)
+        {
+            m_renderer->WaitUntilIdle();
+        }
+
+        // Clear render objects before destroying renderer manager
+        m_objects.clear();
+
         // Destroy managers
         RendererManager::Destroy();
         WindowManager::Destroy();

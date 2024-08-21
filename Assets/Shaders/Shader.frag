@@ -1,12 +1,12 @@
 #version 450 // Use GLSL 4.5
 
-// Input interpolated color from vertex
-layout(location = 0) in vec4 fragColor;
+// Fragment Inputs from interpolating Vertex Outputs
+layout(location = 0) in vec4 fragInColor;
 
-// Output color for fragment
-layout(location = 0) out vec4 outColor;
+// Fragment Outputs
+layout(location = 0) out vec4 fragOutColor;
 
 void main()
 {
-    outColor = fragColor;
+    fragOutColor = fragInColor;
 }

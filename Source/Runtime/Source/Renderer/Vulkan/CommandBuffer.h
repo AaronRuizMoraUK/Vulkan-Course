@@ -1,7 +1,9 @@
 #pragma once
 
 #include <Math/Color.h>
+
 #include <optional>
+#include <vector>
 
 typedef struct VkCommandBuffer_T* VkCommandBuffer;
 typedef struct VkCommandPool_T* VkCommandPool;
@@ -11,6 +13,7 @@ namespace Vulkan
     class Device;
     class FrameBuffer;
     class Pipeline;
+    class Buffer;
 
     // Manages a Vulkan Command Buffer
     class CommandBuffer
@@ -22,16 +25,18 @@ namespace Vulkan
         CommandBuffer(const CommandBuffer&) = delete;
         CommandBuffer& operator=(const CommandBuffer&) = delete;
 
-        bool Initialize(bool createDepthAttachment = false);
+        bool Initialize();
         void Terminate();
 
         VkCommandBuffer GetVkCommandBuffer();
 
         // -----------------------------------------------------------------------------
-        // Call the following functions asynchronously from a thread to record commands.
+        // These functions can be called asynchronously from a thread to record commands.
         // -----------------------------------------------------------------------------
         bool Begin(); // Call this first before the command calls.
         void End();   // Call this last after all the command calls.
+
+        // -- Graphics commands --
 
         void BeginRenderPass(FrameBuffer* frameBuffer,
             std::optional<Math::Color> clearColor,
@@ -41,8 +46,15 @@ namespace Vulkan
 
         void BindPipeline(Pipeline* pipeline);
 
-        void Draw(uint32_t vertexCount, uint32_t firstVertex = 0, 
+        void BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers);
+        void BindIndexBuffer(Buffer* indexBuffer);
+
+        void DrawIndexed(uint32_t indexCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0,
             uint32_t instanceCount = 1, uint32_t firstInstance = 0);
+
+        // -- Transfer commands --
+
+        void CopyBuffer();
 
     private:
         Device* m_device = nullptr;

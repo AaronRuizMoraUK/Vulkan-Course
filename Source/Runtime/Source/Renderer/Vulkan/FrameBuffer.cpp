@@ -107,7 +107,7 @@ namespace Vulkan
         Terminate();
     }
 
-    bool FrameBuffer::Initialize([[maybe_unused]] bool createDepthAttachment)
+    bool FrameBuffer::Initialize(bool createDepthAttachment)
     {
         if (m_vkFrameBuffer)
         {

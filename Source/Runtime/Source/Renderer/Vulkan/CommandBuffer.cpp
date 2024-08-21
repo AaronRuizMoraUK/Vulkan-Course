@@ -3,6 +3,7 @@
 #include <Renderer/Vulkan/Device.h>
 #include <Renderer/Vulkan/FrameBuffer.h>
 #include <Renderer/Vulkan/Pipeline.h>
+#include <Renderer/Vulkan/Buffer.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -22,7 +23,7 @@ namespace Vulkan
         Terminate();
     }
 
-    bool CommandBuffer::Initialize([[maybe_unused]] bool createDepthAttachment)
+    bool CommandBuffer::Initialize()
     {
         if (m_vkCommandBuffer)
         {
@@ -113,7 +114,7 @@ namespace Vulkan
             clearValues.push_back(depthStencilClearValue);
         }
 
-        // Information about how to begin a render pass (only needed for graphical applications)
+        // Information about how to begin a render pass (only needed for graphics operations)
         VkRenderPassBeginInfo vkRenderPassBeginInfo = {};
         vkRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         vkRenderPassBeginInfo.pNext = nullptr;
@@ -141,11 +142,45 @@ namespace Vulkan
         vkCmdBindPipeline(m_vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetVkPipeline());
     }
 
-    void CommandBuffer::Draw(
-        uint32_t vertexCount, uint32_t firstVertex,
+    void CommandBuffer::BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers)
+    {
+        std::vector<VkBuffer> vkVertexBuffers(vertexBuffers.size());
+        std::vector<VkDeviceSize> vkDeviceSizes(vertexBuffers.size());
+
+        for (int i = 0; i < vertexBuffers.size(); ++i)
+        {
+            vkVertexBuffers[i] = vertexBuffers[i]->GetVkBuffer();
+            vkDeviceSizes[i] = 0; // Offset into buffer being bound
+        }
+
+        vkCmdBindVertexBuffers(m_vkCommandBuffer, 
+            0, static_cast<uint32_t>(vkVertexBuffers.size()), vkVertexBuffers.data(), vkDeviceSizes.data());
+    }
+
+    void CommandBuffer::BindIndexBuffer(Buffer* indexBuffer)
+    {
+        VkIndexType vkIndexType;
+        switch (indexBuffer->GetBufferDesc().m_elementSizeInBytes)
+        {
+        case 2:
+            vkIndexType = VK_INDEX_TYPE_UINT16;
+            break;
+        case 4:
+            vkIndexType = VK_INDEX_TYPE_UINT32;
+            break;
+        default:
+            DX_LOG(Fatal, "CommandBuffer", "Index type not supported.");
+            return;
+        }
+
+        vkCmdBindIndexBuffer(m_vkCommandBuffer, indexBuffer->GetVkBuffer(), 0, vkIndexType);
+    }
+
+    void CommandBuffer::DrawIndexed(
+        uint32_t indexCount, uint32_t firstIndex, uint32_t vertexOffset,
         uint32_t instanceCount, uint32_t firstInstance)
     {
-        vkCmdDraw(m_vkCommandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+        vkCmdDrawIndexed(m_vkCommandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
     }
 
     bool CommandBuffer::AllocateVkCommandBuffer()

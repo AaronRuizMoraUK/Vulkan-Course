@@ -1,24 +1,14 @@
 #version 450 // Use GLSL 4.5
 
-// Triangle vertex positions (will put in to vertex buffer later!)
-vec3 VertexPositions[3] = vec3[](
-    vec3(0.0, -0.4, 0.0),
-    vec3(0.4, 0.4, 0.0),
-    vec3(-0.4, 0.4, 0.0)
-);
+// Vertex Inputs
+layout(location = 0) in vec3 vertexInPosition;
+layout(location = 1) in vec4 vertexInColor;
 
-// Triangle vertex colors
-vec4 VertexColors[3] = vec4[](
-    vec4(1.0, 0.0, 0.0, 1.0),
-    vec4(0.0, 1.0, 0.0, 1.0),
-    vec4(0.0, 0.0, 1.0, 1.0)
-);
-
-// Output color for vertex
-layout(location = 0) out vec4 fragColor;
+// Vertex Outputs
+layout(location = 0) out vec4 vertexOutColor;
 
 void main()
 {
-    gl_Position = vec4(VertexPositions[gl_VertexIndex], 1.0);
-    fragColor = VertexColors[gl_VertexIndex];
+    gl_Position = vec4(vertexInPosition, 1.0);
+    vertexOutColor = vertexInColor;
 }

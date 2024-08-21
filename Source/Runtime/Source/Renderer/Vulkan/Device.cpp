@@ -214,6 +214,8 @@ namespace Vulkan
 
     void Device::WaitUntilIdle()
     {
+        DX_LOG(Info, "Vulkan Device", "Waiting until device is idling...");
+
         // Wait until all the commands in the queues have finished executing.
         vkDeviceWaitIdle(m_vkDevice);
     }
