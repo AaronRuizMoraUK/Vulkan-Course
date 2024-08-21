@@ -246,6 +246,14 @@ namespace Vulkan
 
     bool Buffer::CreateVkBuffer()
     {
+        // TODO: Buffer class only supports usages of Vertex and Index buffer,
+        //       which both require initial data and upload them to GPU.
+        //       Modify this code to copy or not the buffer when more buffer
+        //       usages are added, which some of them won't require initial data
+        //       and maybe can be created directly in GPU. Also consider putting
+        //       in the description another member to decide if the final buffer
+        //       should be visible by CPU or not.
+
         if (m_desc.m_usageFlags == 0)
         {
             DX_LOG(Error, "Vulkan Buffer", "Buffer description with no usage flag set.");
