@@ -12,11 +12,18 @@ namespace DX
 {
     namespace Quad
     {
-        static const std::vector<VertexPC> VertexData = {
-            { Math::Vector3Packed({ 0.4f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Red) },
-            { Math::Vector3Packed({ 0.4f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Green) },
-            { Math::Vector3Packed({-0.4f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Blue) },
-            { Math::Vector3Packed({-0.4f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Yellow) },
+        static const std::vector<VertexPC> VertexData1 = {
+            { Math::Vector3Packed({-0.1f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Red) },
+            { Math::Vector3Packed({-0.1f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Green) },
+            { Math::Vector3Packed({-0.9f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Blue) },
+            { Math::Vector3Packed({-0.9f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Yellow) },
+        };
+
+        static const std::vector<VertexPC> VertexData2 = {
+            { Math::Vector3Packed({0.9f,-0.3f, 0.0f}), Math::ColorPacked(Math::Colors::Red) },
+            { Math::Vector3Packed({0.9f, 0.1f, 0.0f}), Math::ColorPacked(Math::Colors::Green) },
+            { Math::Vector3Packed({0.1f, 0.3f, 0.0f}), Math::ColorPacked(Math::Colors::Blue) },
+            { Math::Vector3Packed({0.1f,-0.3f, 0.0f}), Math::ColorPacked(Math::Colors::Yellow) },
         };
 
         static const std::vector<Index> IndexData = { 
@@ -55,7 +62,9 @@ namespace DX
 
         // Prepare render objects
         m_objects.push_back(std::make_unique<SimpleObject>(
-            Math::Transform::CreateIdentity(), Quad::VertexData, Quad::IndexData));
+            Math::Transform::CreateIdentity(), Quad::VertexData1, Quad::IndexData));
+        m_objects.push_back(std::make_unique<SimpleObject>(
+            Math::Transform::CreateIdentity(), Quad::VertexData2, Quad::IndexData));
 
         std::ranges::for_each(m_objects, [this](auto& object) { m_renderer->AddObject(object.get()); });
 
