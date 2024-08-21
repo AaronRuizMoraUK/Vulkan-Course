@@ -10,15 +10,19 @@
 
 namespace DX
 {
-    namespace Triangle
+    namespace Quad
     {
         static const std::vector<VertexPC> VertexData = {
-            { Math::Vector3Packed({ 0.4f,-0.4f, 0.0f}), Math::ColorPacked({1.0f, 0.0f, 0.0f, 1.0f}) },
-            { Math::Vector3Packed({ 0.4f, 0.4f, 0.0f}), Math::ColorPacked({0.0f, 1.0f, 0.0f, 1.0f}) },
-            { Math::Vector3Packed({-0.4f, 0.4f, 0.0f}), Math::ColorPacked({0.0f, 0.0f, 1.0f, 1.0f}) }
+            { Math::Vector3Packed({ 0.4f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Red) },
+            { Math::Vector3Packed({ 0.4f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Green) },
+            { Math::Vector3Packed({-0.4f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Blue) },
+            { Math::Vector3Packed({-0.4f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Yellow) },
         };
 
-        static const std::vector<Index> IndexData = { 0, 1, 2 };
+        static const std::vector<Index> IndexData = { 
+            0, 1, 2,
+            2, 3, 0
+        };
     }
 
     Application::Application() = default;
@@ -51,9 +55,7 @@ namespace DX
 
         // Prepare render objects
         m_objects.push_back(std::make_unique<SimpleObject>(
-            Math::Transform::CreateIdentity(), Triangle::VertexData, Triangle::IndexData));
-        m_objects.push_back(std::make_unique<Cube>(
-            Math::Transform::CreateIdentity(), Math::Vector3(0.2f)));
+            Math::Transform::CreateIdentity(), Quad::VertexData, Quad::IndexData));
 
         std::ranges::for_each(m_objects, [this](auto& object) { m_renderer->AddObject(object.get()); });
 

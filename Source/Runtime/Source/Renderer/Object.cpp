@@ -42,7 +42,7 @@ namespace DX
             m_vertexBuffer = std::make_shared<Vulkan::Buffer>(renderer->GetDevice(), vertexBufferDesc);
             if (!m_vertexBuffer->Initialize())
             {
-                DX_LOG(Fatal, "BaseObject", "Failed to create vertex buffer.");
+                DX_LOG(Fatal, "Object", "Failed to create vertex buffer.");
                 return;
             }
         }
@@ -58,7 +58,7 @@ namespace DX
             m_indexBuffer = std::make_shared<Vulkan::Buffer>(renderer->GetDevice(), indexBufferDesc);
             if (!m_indexBuffer->Initialize())
             {
-                DX_LOG(Fatal, "BaseObject", "Failed to create index buffer.");
+                DX_LOG(Fatal, "Object", "Failed to create index buffer.");
                 return;
             }
         }
