@@ -32,6 +32,7 @@ namespace DX
         WindowId GetId() const { return m_windowId; }
 
         bool IsOpen() const;
+        bool IsMinimized() const;
         const Math::Vector2Int& GetSize() const { return m_size; }
         int GetRefreshRate() const { return m_refreshRate; }
         bool IsFullScreen() const { return m_fullScreen; }

@@ -97,6 +97,11 @@ namespace DX
         return !glfwWindowShouldClose(m_window);
     }
 
+    bool Window::IsMinimized() const
+    {
+        return glfwGetWindowAttrib(m_window, GLFW_ICONIFIED) != 0;
+    }
+
     HWND Window::GetWindowNativeHandler()
     {
 #ifdef _WIN32

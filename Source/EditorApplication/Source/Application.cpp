@@ -98,6 +98,11 @@ namespace DX
             // ------
             // Render
             // ------
+            if (m_window->IsMinimized())
+            {
+                // Skip rendering if window is minimized
+                continue;
+            }
             m_renderer->Render();
         }
     }
