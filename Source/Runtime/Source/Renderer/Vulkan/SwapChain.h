@@ -57,6 +57,11 @@ namespace Vulkan
         Math::Vector2Int m_imageSize = Math::Vector2Int(0);
 
         // Command buffers for sending commands to each swap chain frame buffer.
+        // TODO: Since command buffers can be reused with multiple frame buffers,
+        //       if every frame the command buffer is re-recorded then this vector
+        //       can be moved with the synchronization members (in Renderer.h)
+        //       and have MaxFrameDraws command buffers, instead of one per swap
+        //       buffer image.
         std::vector<std::unique_ptr<CommandBuffer>> m_commandBuffers;
 
         // Frame buffers for drawing into each swap chain image.

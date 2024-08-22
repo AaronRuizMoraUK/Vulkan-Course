@@ -50,7 +50,8 @@ namespace DX
         void AddObject(Object* object);
         void RemoveObject(Object* object);
 
-        // TODO: Remove and generate commands every frame inside Render for the current frame
+        // TODO: Remove this function and inside Render() record the
+        //       commands every frame the current frame command buffer.
         void RecordCommands();
 
     private:
@@ -77,7 +78,7 @@ namespace DX
     private:
         // ---------------------------
         // Synchronization
-        // TODO: Move out of renderer. Maybe to SwapChain class.
+        // TODO: Move out of renderer. Maybe to SwapChain class or a new class.
         bool CreateSynchronisation();
 
         // MaxFrameDraws needs to be lower than number of images in swap chain,
