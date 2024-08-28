@@ -6,6 +6,10 @@
 #include <Renderer/Vulkan/SwapChain.h>
 #include <Renderer/Vulkan/Pipeline.h>
 #include <Renderer/Vulkan/CommandBuffer.h>
+#include <Renderer/Vulkan/Buffer.h>
+#include <Renderer/Vulkan/PipelineDescriptorSet.h>
+
+#include <Camera/Camera.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -18,9 +22,6 @@ namespace DX
         : m_rendererId(rendererId)
         , m_window(window)
     {
-        m_vkImageAvailableSemaphores.fill(nullptr);
-        m_vkRenderFinishedSemaphores.fill(nullptr);
-        m_vkRenderFences.fill(nullptr);
     }
 
     Renderer::~Renderer()
@@ -73,28 +74,43 @@ namespace DX
             return false;
         }
 
+        if (!CreateFrameData())
+        {
+            Terminate();
+            return false;
+        }
+
         return true;
     }
 
     void Renderer::Terminate()
     {
-        // Necessary before destroying synchronization data
+        // Necessary before destroying synchronization and frame data
         WaitUntilIdle();
 
         DX_LOG(Info, "Renderer", "Terminating Renderer...");
 
+        m_perObjectDescritorSets.clear();
+        m_uniformWVPBuffers.clear();
+
         if (m_device)
         {
-            for (int i = 0; i < MaxFrameDraws; ++i)
-            {
-                vkDestroySemaphore(m_device->GetVkDevice(), m_vkImageAvailableSemaphores[i], nullptr);
-                vkDestroySemaphore(m_device->GetVkDevice(), m_vkRenderFinishedSemaphores[i], nullptr);
-                vkDestroyFence(m_device->GetVkDevice(), m_vkRenderFences[i], nullptr);
-            }
+            std::ranges::for_each(m_vkImageAvailableSemaphores, [this](VkSemaphore vkSemaphore)
+                {
+                    vkDestroySemaphore(m_device->GetVkDevice(), vkSemaphore, nullptr);
+                });
+            std::ranges::for_each(m_vkRenderFinishedSemaphores, [this](VkSemaphore vkSemaphore)
+                {
+                    vkDestroySemaphore(m_device->GetVkDevice(), vkSemaphore, nullptr);
+                });
+            std::ranges::for_each(m_vkRenderFences, [this](VkFence vkFence)
+                {
+                    vkDestroyFence(m_device->GetVkDevice(), vkFence, nullptr);
+                });
         }
-        m_vkImageAvailableSemaphores.fill(nullptr);
-        m_vkRenderFinishedSemaphores.fill(nullptr);
-        m_vkRenderFences.fill(nullptr);
+        m_vkImageAvailableSemaphores.clear();
+        m_vkRenderFinishedSemaphores.clear();
+        m_vkRenderFences.clear();
 
         m_pipeline.reset();
         m_swapChain.reset();
@@ -149,6 +165,18 @@ namespace DX
             return;
         }
 
+        // Update uniform WVP buffer with object's matrices
+        // TODO: This won't work per object since these commands are pre-recorded.
+        {
+            WorldViewProjBuffer wvp = {
+                .m_worldMatrix = Math::Transform::CreateIdentity().ToMatrix(),
+                .m_viewMatrix = m_camera->GetViewMatrix(),
+                .m_projMatrix = m_camera->GetProjectionMatrix()
+            };
+            wvp.FlipYProj();
+            m_uniformWVPBuffers[swapChainImageIndex]->UpdateBufferData(&wvp, sizeof(wvp));
+        }
+
         // 2) Submit the command buffer (of the current image) to the queue for execution.
         //    Wait at the convenient stage within the pipeline for the image semaphore to be signaled (so it's available for drawing to it).
         //    For example, allow to execute vertex shader, but wait for the image semaphore to be available before executing fragment shader.
@@ -199,7 +227,7 @@ namespace DX
         }
 
         // Next frame
-        m_currentFrame = (m_currentFrame + 1) % MaxFrameDraws;
+        m_currentFrame = (m_currentFrame + 1) % Vulkan::MaxFrameDraws;
     }
 
     void Renderer::WaitUntilIdle()
@@ -208,6 +236,11 @@ namespace DX
         {
             m_device->WaitUntilIdle();
         }
+    }
+
+    void Renderer::SetCamera(Camera* camera)
+    {
+        m_camera = camera;
     }
 
     void Renderer::AddObject(Object* object)
@@ -237,6 +270,9 @@ namespace DX
 
                 for (auto* object : m_objects)
                 {
+                    // Binding pipeline descriptor sets, which includes WVP uniform buffer
+                    commandBuffer->BindPipelineDescriptorSet(m_perObjectDescritorSets[imageIndex].get());
+
                     // Bind Vertex and Index Buffers
                     commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });
                     commandBuffer->BindIndexBuffer(object->GetIndexBuffer().get());
@@ -287,9 +323,9 @@ namespace DX
             return false;
         }
 
-        DX_ASSERT(MaxFrameDraws < m_swapChain->GetImageCount(), "Renderer",
+        DX_ASSERT(Vulkan::MaxFrameDraws < m_swapChain->GetImageCount(), "Renderer",
             "MaxFrameDraws (%d) is greater or equal than swap chain's images (%d).",
-            MaxFrameDraws, m_swapChain->GetImageCount());
+            Vulkan::MaxFrameDraws, m_swapChain->GetImageCount());
 
         return true;
     }
@@ -334,7 +370,11 @@ namespace DX
         vkFenceCreateInfo.pNext = nullptr;
         vkFenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT; // Start fence signaled
 
-        for (int i = 0; i < MaxFrameDraws; ++i)
+        m_vkImageAvailableSemaphores.resize(Vulkan::MaxFrameDraws, nullptr);
+        m_vkRenderFinishedSemaphores.resize(Vulkan::MaxFrameDraws, nullptr);
+        m_vkRenderFences.resize(Vulkan::MaxFrameDraws, nullptr);
+
+        for (int i = 0; i < Vulkan::MaxFrameDraws; ++i)
         {
             if (vkCreateSemaphore(m_device->GetVkDevice(), &vkSemaphoreCreateInfo,
                 nullptr, &m_vkImageAvailableSemaphores[i]) != VK_SUCCESS)
@@ -355,6 +395,58 @@ namespace DX
             {
                 DX_LOG(Error, "Renderer", "Failed to create Vulkan render fence.");
                 return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool Renderer::CreateFrameData()
+    {
+        const int imageCount = m_swapChain->GetImageCount();
+
+        // Uniform Buffers
+        {
+            Vulkan::BufferDesc bufferDesc = {};
+            bufferDesc.m_elementSizeInBytes = sizeof(WorldViewProjBuffer);
+            bufferDesc.m_elementCount = 1;
+            bufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
+            bufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
+            bufferDesc.m_initialData = nullptr; // WVP matrices data will be set every frame to this buffer
+
+            m_uniformWVPBuffers.resize(imageCount);
+
+            for (int i = 0; i < imageCount; ++i)
+            {
+                m_uniformWVPBuffers[i] = std::make_shared<Vulkan::Buffer>(m_device.get(), bufferDesc);
+                if (!m_uniformWVPBuffers[i]->Initialize())
+                {
+                    DX_LOG(Error, "Renderer", "Failed to create uniform buffer for WVP matrices.");
+                    return false;
+                }
+            }
+        }
+
+        // Pipeline Descriptor Sets
+        {
+            m_perObjectDescritorSets.resize(imageCount);
+
+            for (int i = 0; i < imageCount; ++i)
+            {
+                m_perObjectDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet();
+                if (!m_perObjectDescritorSets[i]->Initialize())
+                {
+                    return false;
+                }
+            }
+        }
+
+        // Fill the Pipeline Descriptor Sets with the Uniform Buffers
+        {
+            for (int i = 0; i < imageCount; ++i)
+            {
+                // WVP uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
+                m_perObjectDescritorSets[i]->SetUniformBuffer(0, m_uniformWVPBuffers[i].get());
             }
         }
 

@@ -58,13 +58,18 @@ namespace DX
         }
 
         // Camera
-        m_camera = std::make_unique<Camera>(Math::Vector3(0.0f, 2.0f, -2.0f), Math::Vector3(0.0f, 1.0f, 0.0f));
+        //m_camera = std::make_unique<Camera>(Math::Vector3(0.0f, 2.0f, -2.0f), Math::Vector3(0.0f, 1.0f, 0.0f));
+        m_camera = std::make_unique<Camera>(Math::Vector3(0.0f, 0.0f, 2.0f), Math::Vector3(0.0f, 0.0f, 0.0f));
+
+        m_renderer->SetCamera(m_camera.get());
 
         // Prepare render objects
         m_objects.push_back(std::make_unique<SimpleObject>(
             Math::Transform::CreateIdentity(), Quad::VertexData1, Quad::IndexData));
         m_objects.push_back(std::make_unique<SimpleObject>(
             Math::Transform::CreateIdentity(), Quad::VertexData2, Quad::IndexData));
+        m_objects.push_back(std::make_unique<Cube>(
+            Math::Transform::CreateIdentity(), Math::Vector3(1.0f)));
 
         std::ranges::for_each(m_objects, [this](auto& object) { m_renderer->AddObject(object.get()); });
 

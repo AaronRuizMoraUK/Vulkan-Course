@@ -7,10 +7,16 @@ typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkDevice_T* VkDevice;
 typedef struct VkQueue_T* VkQueue;
 typedef struct VkCommandPool_T* VkCommandPool;
+typedef struct VkDescriptorPool_T* VkDescriptorPool;
 
 namespace Vulkan
 {
     class Instance;
+
+    // MaxFrameDraws needs to be lower than number of images in swap chain,
+    // that way it'll block until there are images available for drawing and
+    // won't affect the one being presented.
+    constexpr int MaxFrameDraws = 2;
 
     enum QueueFamilyType
     {
@@ -62,6 +68,7 @@ namespace Vulkan
         VkPhysicalDevice GetVkPhysicalDevice();
         VkQueue GetVkQueue(QueueFamilyType queueFamilyType);
         VkCommandPool GetVkCommandPool(QueueFamilyType queueFamilyType);
+        VkDescriptorPool GetVkDescriptorPool();
 
         const QueueFamilyInfo& GetQueueFamilyInfo() const;
 
@@ -71,11 +78,15 @@ namespace Vulkan
     private:
         bool CreateVkDevice();
         bool CreateVkCommandPools();
+        bool CreateVkDescriptorPool();
 
         VkPhysicalDevice m_vkPhysicalDevice = nullptr;
         QueueFamilyInfo m_queueFamilyInfo;
         VkDevice m_vkDevice = nullptr;
         std::array<VkQueue, QueueFamilyType_Count> m_vkQueues;
+
         std::array<VkCommandPool, QueueFamilyType_Count> m_vkCommandPools;
+
+        VkDescriptorPool m_vkDescriptorPool = nullptr;
     };
 } // namespace Vulkan

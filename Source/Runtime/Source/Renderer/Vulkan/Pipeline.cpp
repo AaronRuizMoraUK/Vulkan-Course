@@ -1,6 +1,7 @@
 #include <Renderer/Vulkan/Pipeline.h>
 
 #include <Renderer/Vulkan/Device.h>
+#include <Renderer/Vulkan/PipelineDescriptorSet.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -64,6 +65,12 @@ namespace Vulkan
             return false;
         }
 
+        if (!CreateVkDescriptorSetLayout())
+        {
+            Terminate();
+            return false;
+        }
+
         if (!CreateVkPipelineLayout())
         {
             Terminate();
@@ -89,6 +96,9 @@ namespace Vulkan
         vkDestroyPipelineLayout(m_device->GetVkDevice(), m_vkPipelineLayout, nullptr);
         m_vkPipelineLayout = nullptr;
 
+        vkDestroyDescriptorSetLayout(m_device->GetVkDevice(), m_vkDescriptorSetLayout, nullptr);
+        m_vkDescriptorSetLayout = nullptr;
+
         vkDestroyRenderPass(m_device->GetVkDevice(), m_vkRenderPass, nullptr);
         m_vkRenderPass = nullptr;
     }
@@ -101,6 +111,12 @@ namespace Vulkan
     VkPipeline Pipeline::GetVkPipeline()
     {
         return m_vkPipeline;
+    }
+
+    std::shared_ptr<PipelineDescriptorSet> Pipeline::CreatePipelineDescriptorSet() const
+    {
+        return std::make_shared<PipelineDescriptorSet>(
+            m_device, m_device->GetVkDescriptorPool(), m_vkDescriptorSetLayout, m_vkPipelineLayout);
     }
 
     bool Pipeline::CreateVkRenderPass()
@@ -245,16 +261,49 @@ namespace Vulkan
         return true;
     }
 
+    bool Pipeline::CreateVkDescriptorSetLayout()
+    {
+        // TODO: Obtain this from the shaders.
+        // 
+        // WVP Binding Info
+        const VkDescriptorSetLayoutBinding wvpLayoutBinding = {
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
+            .pImmutableSamplers = nullptr
+        };
+
+        // Create Descriptor Set Layout with given bindings
+        VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
+        vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
+        vkDescriptorSetLayoutCreateInfo.flags = 0;
+        vkDescriptorSetLayoutCreateInfo.bindingCount = 1;
+        vkDescriptorSetLayoutCreateInfo.pBindings = &wvpLayoutBinding;
+
+        if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(), 
+            &vkDescriptorSetLayoutCreateInfo, nullptr, &m_vkDescriptorSetLayout) != VK_SUCCESS)
+        {
+            DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
+            return false;
+        }
+
+        return true;
+    }
+
     bool Pipeline::CreateVkPipelineLayout()
     {
+        // TODO: Obtain this from the shaders.
+
         // Create Pipeline Layout (Resources Layout)
         // Where to specify Descriptor Set Layouts and Push Constant Ranges.
         VkPipelineLayoutCreateInfo vkPipelineLayoutCreateInfo = {};
         vkPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         vkPipelineLayoutCreateInfo.pNext = nullptr;
         vkPipelineLayoutCreateInfo.flags = 0;
-        vkPipelineLayoutCreateInfo.setLayoutCount = 0;
-        vkPipelineLayoutCreateInfo.pSetLayouts = nullptr;
+        vkPipelineLayoutCreateInfo.setLayoutCount = 1;
+        vkPipelineLayoutCreateInfo.pSetLayouts = &m_vkDescriptorSetLayout;
         vkPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
         vkPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 

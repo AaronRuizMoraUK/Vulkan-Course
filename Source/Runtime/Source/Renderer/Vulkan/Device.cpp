@@ -192,6 +192,12 @@ namespace Vulkan
             return false;
         }
 
+        if (!CreateVkDescriptorPool())
+        {
+            Terminate();
+            return false;
+        }
+
         return true;
     }
 
@@ -199,11 +205,14 @@ namespace Vulkan
     {
         DX_LOG(Info, "Vulkan Device", "Terminating Vulkan Device...");
 
-        for (auto vkCommandPool : m_vkCommandPools)
-        {
-            vkDestroyCommandPool(m_vkDevice, vkCommandPool, nullptr);
-        }
-        m_vkCommandPools.fill(nullptr);
+        vkDestroyDescriptorPool(m_vkDevice, m_vkDescriptorPool, nullptr);
+        m_vkDescriptorPool = nullptr;
+
+        std::ranges::for_each(m_vkCommandPools, [this](VkCommandPool& vkCommandPool)
+            {
+                vkDestroyCommandPool(m_vkDevice, vkCommandPool, nullptr);
+                vkCommandPool = nullptr;
+            });
 
         vkDestroyDevice(m_vkDevice, nullptr);
         m_vkDevice = nullptr;
@@ -243,6 +252,11 @@ namespace Vulkan
     VkCommandPool Device::GetVkCommandPool(QueueFamilyType queueFamilyType)
     {
         return m_vkCommandPools[queueFamilyType];
+    }
+
+    VkDescriptorPool Device::GetVkDescriptorPool()
+    {
+        return m_vkDescriptorPool;
     }
 
     const QueueFamilyInfo& Device::GetQueueFamilyInfo() const
@@ -391,6 +405,43 @@ namespace Vulkan
                 DX_LOG(Error, "Vulkan Device", "Failed to create Vulkan command pool.");
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    bool Device::CreateVkDescriptorPool()
+    {
+        // TODO: Remove and use MaxFrameDraws when the uniform buffers
+        //       are created per max frame draws and not by number of
+        //       images in the swap chain.
+        constexpr int tempMaxFrameDraws = 3;
+
+        // Increase max counts as needed
+        constexpr int maxDescriptorSetsPerFrame = 1;
+        constexpr int maxUniformBuffersPerFrame = 1;
+
+        // Max number of descriptor sets in the pool.
+        // Descriptor sets contain descriptors. A descriptor can be used in different descriptor sets.
+        constexpr int maxDescriptorSets = tempMaxFrameDraws * maxDescriptorSetsPerFrame;
+
+        // Max number of descriptors (per type) in the pool.
+        const std::vector<VkDescriptorPoolSize> vkDescriptorPoolSizes = {
+            {.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = tempMaxFrameDraws * maxUniformBuffersPerFrame }
+        };
+
+        VkDescriptorPoolCreateInfo vkDescriptorPoolCreateInfo = {};
+        vkDescriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        vkDescriptorPoolCreateInfo.pNext= nullptr;
+        vkDescriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; // To allow free descriptor sets
+        vkDescriptorPoolCreateInfo.maxSets = maxDescriptorSets;
+        vkDescriptorPoolCreateInfo.poolSizeCount = static_cast<uint32_t>(vkDescriptorPoolSizes.size());
+        vkDescriptorPoolCreateInfo.pPoolSizes = vkDescriptorPoolSizes.data();
+
+        if (vkCreateDescriptorPool(m_vkDevice, &vkDescriptorPoolCreateInfo, nullptr, &m_vkDescriptorPool) != VK_SUCCESS)
+        {
+            DX_LOG(Error, "Vulkan Device", "Failed to create Vulkan descriptor pool.");
+            return false;
         }
 
         return true;

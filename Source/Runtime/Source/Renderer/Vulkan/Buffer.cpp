@@ -201,7 +201,25 @@ namespace Vulkan
 
             return true;
         }
-    }
+
+        bool CopyDataToVkBufferMemory(Device* device, VkDeviceMemory vkBufferMemory, const void* bufferData, size_t bufferSize)
+        {
+            void* dstData = nullptr;
+
+            if (vkMapMemory(device->GetVkDevice(), vkBufferMemory, 0, bufferSize, 0, &dstData) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Vulkan Buffer", "Failed to map Vulkan buffer memory.");
+                return false;
+            }
+
+            memcpy(dstData, bufferData, bufferSize);
+
+            vkUnmapMemory(device->GetVkDevice(), vkBufferMemory);
+
+            // NOTE: No need to flush and invalidate since the device memory has the flag VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+            return true;
+        }
+    } // namespace Utils
 
     Buffer::Buffer(Device* device, const BufferDesc& desc)
         : m_device(device)
@@ -244,34 +262,44 @@ namespace Vulkan
         return m_vkBuffer;
     }
 
+    bool Buffer::UpdateBufferData(const void* data, size_t dataSize)
+    {
+        if (m_desc.m_memoryProperty != BufferMemoryProperty::HostVisible)
+        {
+            DX_LOG(Error, "Vulkan Buffer", "Only Host Visible buffers can update its data.");
+            return false;
+        }
+        else if (dataSize > m_desc.m_elementSizeInBytes * m_desc.m_elementCount)
+        {
+            DX_LOG(Error, "Vulkan Buffer", "Trying to copy more data (%d bytes) than buffer's size (%d).",
+                dataSize, m_desc.m_elementSizeInBytes * m_desc.m_elementCount);
+            return false;
+        }
+
+        if (!Utils::CopyDataToVkBufferMemory(m_device, m_vkBufferMemory, data, dataSize))
+        {
+            DX_LOG(Error, "Vulkan Buffer", "Failed to map Vulkan buffer memory.");
+            return false;
+        }
+
+        return true;
+    }
+
     bool Buffer::CreateVkBuffer()
     {
-        // TODO: Buffer class only supports usages of Vertex and Index buffer,
-        //       which both require initial data and upload them to GPU.
-        //       Modify this code to copy or not the buffer when more buffer
-        //       usages are added, which some of them won't require initial data
-        //       and maybe can be created directly in GPU. Also consider putting
-        //       in the description another member to decide if the final buffer
-        //       should be visible by CPU or not.
-
         if (m_desc.m_usageFlags == 0)
         {
             DX_LOG(Error, "Vulkan Buffer", "Buffer description with no usage flag set.");
             return false;
         }
-        else if (!m_desc.m_initialData)
-        {
-            DX_LOG(Error, "Vulkan Buffer", "Buffer description with no initial data.");
-            return false;
-        }
 
         const size_t bufferSize = m_desc.m_elementSizeInBytes * m_desc.m_elementCount;
 
-        // Create staging source buffer to put data before transferring to GPU
-        Utils::ScopedBuffer stageBuffer(m_device);
+        switch (m_desc.m_memoryProperty)
         {
-            const VkBufferUsageFlags vkBufferUsageFlags =
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        case BufferMemoryProperty::HostVisible:
+        {
+            const VkBufferUsageFlags vkBufferUsageFlags = ToVkBufferUsageFlags(m_desc.m_usageFlags);
 
             // Memory properties we want:
             // - VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: visible to the CPU (not optimal for GPU performance)
@@ -283,50 +311,93 @@ namespace Vulkan
                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
             if (!Utils::CreateVkBuffer(m_device, bufferSize,
-                vkBufferUsageFlags, vkMemoryProperties, &stageBuffer.m_vkBuffer, &stageBuffer.m_vkBufferMemory))
-            {
-                return false;
-            }
-        }
-
-        // Copy data to "stage" buffer
-        {
-            void* dstData = nullptr;
-
-            if (vkMapMemory(m_device->GetVkDevice(), stageBuffer.m_vkBufferMemory, 0, bufferSize, 0, &dstData) != VK_SUCCESS)
-            {
-                DX_LOG(Error, "Vulkan Buffer", "Failed to map Vulkan buffer memory.");
-                return false;
-            }
-
-            memcpy(dstData, m_desc.m_initialData, bufferSize);
-
-            vkUnmapMemory(m_device->GetVkDevice(), stageBuffer.m_vkBufferMemory);
-
-            // NOTE: No need to flush and invalidate since the memory has the flag VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-        }
-
-        // Create destination buffer in GPU
-        {
-            const VkBufferUsageFlags vkBufferUsageFlags =
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT | 
-                ToVkBufferUsageFlags(m_desc.m_usageFlags);
-
-            // Memory properties we want:
-            // - VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT: visible to the GPU only (optimal for GPU performance)
-            const VkMemoryPropertyFlags vkMemoryProperties =
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-
-            if (!Utils::CreateVkBuffer(m_device, bufferSize,
                 vkBufferUsageFlags, vkMemoryProperties, &m_vkBuffer, &m_vkBufferMemory))
             {
                 return false;
             }
+
+            // Copy data to buffer
+            if (m_desc.m_initialData)
+            {
+                if (!Utils::CopyDataToVkBufferMemory(m_device, m_vkBufferMemory, m_desc.m_initialData, bufferSize))
+                {
+                    DX_LOG(Error, "Vulkan Buffer", "Failed to map Vulkan buffer memory.");
+                    return false;
+                }
+            }
+            break;
         }
 
-        // Copy staging buffer to destination buffer on GPU
-        if (!Utils::CopyVkBuffer(m_device, m_vkBuffer, stageBuffer.m_vkBuffer, bufferSize))
+        case BufferMemoryProperty::DeviceLocal:
         {
+            // If there is initial data to copy, use a staging buffer to transfer the data to the GPU buffer
+            if (m_desc.m_initialData)
+            {
+                // Create staging source buffer to put data before transferring to GPU
+                Utils::ScopedBuffer stageBuffer(m_device);
+                {
+                    const VkBufferUsageFlags vkBufferUsageFlags =
+                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT; // Source of the transfer
+
+                    const VkMemoryPropertyFlags vkMemoryProperties =
+                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+                    if (!Utils::CreateVkBuffer(m_device, bufferSize,
+                        vkBufferUsageFlags, vkMemoryProperties, &stageBuffer.m_vkBuffer, &stageBuffer.m_vkBufferMemory))
+                    {
+                        return false;
+                    }
+                }
+
+                // Copy data to "stage" buffer
+                if (!Utils::CopyDataToVkBufferMemory(m_device, stageBuffer.m_vkBufferMemory, m_desc.m_initialData, bufferSize))
+                {
+                    DX_LOG(Error, "Vulkan Buffer", "Failed to map Vulkan buffer memory.");
+                    return false;
+                }
+
+                // Create destination buffer in GPU
+                {
+                    const VkBufferUsageFlags vkBufferUsageFlags =
+                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | // Destination of the transfer
+                        ToVkBufferUsageFlags(m_desc.m_usageFlags);
+
+                    // Memory properties we want:
+                    // - VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT: visible to the GPU only (optimal for GPU performance)
+                    const VkMemoryPropertyFlags vkMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+                    if (!Utils::CreateVkBuffer(m_device, bufferSize,
+                        vkBufferUsageFlags, vkMemoryProperties, &m_vkBuffer, &m_vkBufferMemory))
+                    {
+                        return false;
+                    }
+                }
+
+                // Execute commands to copy staging buffer to destination buffer on GPU
+                if (!Utils::CopyVkBuffer(m_device, m_vkBuffer, stageBuffer.m_vkBuffer, bufferSize))
+                {
+                    return false;
+                }
+            }
+            // It there is no initial data to copy, just create buffer in GPU
+            else
+            {
+                const VkBufferUsageFlags vkBufferUsageFlags = ToVkBufferUsageFlags(m_desc.m_usageFlags);
+
+                const VkMemoryPropertyFlags vkMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+                if (!Utils::CreateVkBuffer(m_device, bufferSize,
+                    vkBufferUsageFlags, vkMemoryProperties, &m_vkBuffer, &m_vkBufferMemory))
+                {
+                    return false;
+                }
+            }
+            break;
+        }
+
+        default:
+            DX_LOG(Fatal, "Vulkan Buffer", "Unexpected buffer memory property %d.", m_desc.m_memoryProperty);
             return false;
         }
 

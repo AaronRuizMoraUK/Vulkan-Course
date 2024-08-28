@@ -9,6 +9,7 @@ namespace Vulkan
 
         vkBufferUsageFlags |= (flags & BufferUsage_VertexBuffer) ? VK_BUFFER_USAGE_VERTEX_BUFFER_BIT : 0;
         vkBufferUsageFlags |= (flags & BufferUsage_IndexBuffer) ? VK_BUFFER_USAGE_INDEX_BUFFER_BIT : 0;
+        vkBufferUsageFlags |= (flags & BufferUsage_UniformBuffer) ? VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT : 0;
 
         return vkBufferUsageFlags;
     }

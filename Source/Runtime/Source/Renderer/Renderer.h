@@ -3,7 +3,9 @@
 #include <Window/Window.h>
 #include <GenericId/GenericId.h>
 
-#include <array>
+#include <Math/Matrix4x4.h>
+
+#include <vector>
 #include <memory>
 #include <unordered_set>
 
@@ -16,10 +18,13 @@ namespace Vulkan
     class Device;
     class SwapChain;
     class Pipeline;
+    class Buffer;
+    class PipelineDescriptorSet;
 }
 
 namespace DX
 {
+    class Camera;
     class Object;
 
     using RendererId = GenericId<struct RendererIdTag>;
@@ -47,6 +52,8 @@ namespace DX
         // Wait until no actions being run on device before destroying.
         void WaitUntilIdle();
 
+        void SetCamera(Camera* camera);
+
         void AddObject(Object* object);
         void RemoveObject(Object* object);
 
@@ -58,7 +65,26 @@ namespace DX
         RendererId m_rendererId;
         Window* m_window = nullptr;
 
+        // Camera
+        Camera* m_camera = nullptr;
+
+        // Scene objects
         std::unordered_set<Object*> m_objects;
+
+        // Scene resources
+        struct WorldViewProjBuffer
+        {
+            Math::Matrix4x4Packed m_worldMatrix;
+            Math::Matrix4x4Packed m_viewMatrix;
+            Math::Matrix4x4Packed m_projMatrix;
+
+            // Vulkan screen coordinates have negative Y values for the top of the screen.
+            // This function will flip the Y coordinates to expected values.
+            void FlipYProj()
+            {
+                m_projMatrix.columns[1].y *= -1.0f;
+            }
+        };
 
     private:
         bool CreateInstance();
@@ -78,23 +104,39 @@ namespace DX
     private:
         // ---------------------------
         // Synchronization
-        // TODO: Move out of renderer. Maybe to SwapChain class or a new class.
+        // 
+        // TODO: Move out of renderer to a new class.
         bool CreateSynchronisation();
 
-        // MaxFrameDraws needs to be lower than number of images in swap chain,
-        // that way it'll block until there are images available for drawing and
-        // won't affect the one being presented.
-        static const int MaxFrameDraws = 2; 
         int m_currentFrame = 0;
 
         // Used to know when the swap chain image is ready for drawing.
-        std::array<VkSemaphore, MaxFrameDraws> m_vkImageAvailableSemaphores;
+        std::vector<VkSemaphore> m_vkImageAvailableSemaphores;
         // Used to know when the execution of the command buffer in the
         // queue (rendering) has finished and therefore can be presented
         // in the swap chain image.
-        std::array<VkSemaphore, MaxFrameDraws> m_vkRenderFinishedSemaphores;
+        std::vector<VkSemaphore> m_vkRenderFinishedSemaphores;
         // Used to know when a render frame hasn't finished and wait until it does.
         // It protected render function from doing more than MaxFrameDraws renders.
-        std::array<VkFence, MaxFrameDraws> m_vkRenderFences;
+        std::vector<VkFence> m_vkRenderFences;
+
+    private:
+        // ---------------------------
+        // Per Frame data
+        // 
+        // NOTE: Since we are pre-recording all the commands and not every frame,
+        //       we need as many elements as frame buffers (that's as many elements
+        //       as swap chain images). Once the commands are generated every frame
+        //       then it should be enough with having MaxFrameDraws elements instead.
+        // 
+        // TODO: Move out of renderer to a new class.
+        bool CreateFrameData();
+
+        // We need uniform buffers for each frame so they won't stumble into each other
+        // while drawing the independent frames. They might have different content per frame.
+        std::vector<std::shared_ptr<Vulkan::Buffer>> m_uniformWVPBuffers;
+        // We need pipeline descriptor sets for each frame so they won't stumble into each other
+        // while drawing the independent frames. They might have different content per frame.
+        std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perObjectDescritorSets;
     };
 } // namespace DX

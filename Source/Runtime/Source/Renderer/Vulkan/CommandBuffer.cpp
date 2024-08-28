@@ -3,6 +3,7 @@
 #include <Renderer/Vulkan/Device.h>
 #include <Renderer/Vulkan/FrameBuffer.h>
 #include <Renderer/Vulkan/Pipeline.h>
+#include <Renderer/Vulkan/PipelineDescriptorSet.h>
 #include <Renderer/Vulkan/Buffer.h>
 #include <Renderer/Vulkan/Utils.h>
 
@@ -137,6 +138,22 @@ namespace Vulkan
     void CommandBuffer::BindPipeline(Pipeline* pipeline)
     {
         vkCmdBindPipeline(m_vkCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->GetVkPipeline());
+    }
+
+    void CommandBuffer::BindPipelineDescriptorSet(PipelineDescriptorSet* descriptorSet)
+    {
+        const std::vector<VkDescriptorSet> vkDescriptorSets = {
+            descriptorSet->GetVkDescriptorSet()
+        };
+
+        vkCmdBindDescriptorSets(m_vkCommandBuffer, 
+            VK_PIPELINE_BIND_POINT_GRAPHICS, 
+            descriptorSet->GetVkPipelineLayout(),
+            0, // Index of first descriptor set to bind (TODO: to obtain from PipelineDescriptorSet)
+            static_cast<uint32_t>(vkDescriptorSets.size()),
+            vkDescriptorSets.data(),
+            0, // Dynamic offset count
+            nullptr);
     }
 
     void CommandBuffer::BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers)

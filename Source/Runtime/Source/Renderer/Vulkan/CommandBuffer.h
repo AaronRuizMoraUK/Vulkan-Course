@@ -16,6 +16,7 @@ namespace Vulkan
     class Device;
     class FrameBuffer;
     class Pipeline;
+    class PipelineDescriptorSet;
     class Buffer;
 
     // Manages a Vulkan Command Buffer
@@ -48,6 +49,8 @@ namespace Vulkan
         void EndRenderPass();
 
         void BindPipeline(Pipeline* pipeline);
+
+        void BindPipelineDescriptorSet(PipelineDescriptorSet* descriptorSet);
 
         void BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers);
         void BindIndexBuffer(Buffer* indexBuffer);

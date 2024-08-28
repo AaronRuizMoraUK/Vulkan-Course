@@ -26,6 +26,8 @@ namespace Vulkan
 
         VkBuffer GetVkBuffer();
 
+        bool UpdateBufferData(const void* data, size_t dataSize);
+
     private:
         Device* m_device = nullptr;
         BufferDesc m_desc;
