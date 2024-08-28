@@ -167,6 +167,7 @@ namespace DX
 
         // Update uniform WVP buffer with object's matrices
         // TODO: This won't work per object since these commands are pre-recorded.
+        //       See comment in RecordCommands function for more details.
         {
             WorldViewProjBuffer wvp = {
                 .m_worldMatrix = Math::Transform::CreateIdentity().ToMatrix(),
@@ -270,7 +271,18 @@ namespace DX
 
                 for (auto* object : m_objects)
                 {
-                    // Binding pipeline descriptor sets, which includes WVP uniform buffer
+                    // The WVP uniform buffer is updated at the Render function every frame.
+                    // But it'll set the WVP matrices to the buffer once and use it
+                    // for all objects. Due to the asynchronous nature of Vulkan, rendering
+                    // using one buffer and update it with each object's data won't work, because
+                    // it's not possible to assure when the draw command for a particular object
+                    // will get executed, and waiting for each object to finish drawing would be
+                    // a very slow approach. 
+                    // 
+                    // TODO: This will be improved by using dynamic uniform buffers so each object
+                    //       can use its own world matrix.
+
+                    // Bind pipeline descriptor set, which includes the WVP uniform buffer
                     commandBuffer->BindPipelineDescriptorSet(m_perObjectDescritorSets[imageIndex].get());
 
                     // Bind Vertex and Index Buffers
