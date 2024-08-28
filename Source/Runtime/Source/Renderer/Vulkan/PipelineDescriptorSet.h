@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <limits>
 
 typedef struct VkDescriptorSet_T* VkDescriptorSet;
 typedef struct VkDescriptorPool_T* VkDescriptorPool;
@@ -20,7 +21,8 @@ namespace Vulkan
             Device* device, 
             VkDescriptorPool vkDescriptorPool, 
             VkDescriptorSetLayout vkDescriptorSetLayout,
-            VkPipelineLayout vkPipelineLayout);
+            VkPipelineLayout vkPipelineLayout,
+            uint32_t setLayoutIndex);
         ~PipelineDescriptorSet();
 
         PipelineDescriptorSet(const PipelineDescriptorSet&) = delete;
@@ -31,6 +33,7 @@ namespace Vulkan
 
         VkDescriptorSet GetVkDescriptorSet();
         VkPipelineLayout GetVkPipelineLayout();
+        uint32_t GetSetLayoutIndex() const;
 
         void SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer);
 
@@ -39,6 +42,7 @@ namespace Vulkan
         VkDescriptorPool m_vkDescriptorPool = nullptr;
         VkDescriptorSetLayout m_vkDescriptorSetLayout = nullptr;
         VkPipelineLayout m_vkPipelineLayout = nullptr;
+        uint32_t m_setLayoutIndex = std::numeric_limits<uint32_t>::max(); // Index of this descriptor set layout inside the pipeline layout
 
     private:
         bool CreateVkDescriptorSet();

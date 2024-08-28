@@ -71,19 +71,38 @@ namespace DX
         // Scene objects
         std::unordered_set<Object*> m_objects;
 
-        // Scene resources
-        struct WorldViewProjBuffer
+        // Per Scene Resources
+        struct ViewProjBuffer
         {
-            Math::Matrix4x4Packed m_worldMatrix;
             Math::Matrix4x4Packed m_viewMatrix;
             Math::Matrix4x4Packed m_projMatrix;
+            Math::Vector4Packed m_camPos;
 
+            ViewProjBuffer(
+                const Math::Matrix4x4& viewMatrix,
+                const Math::Matrix4x4& projMatrix,
+                const Math::Vector4& camPos)
+                : m_viewMatrix(viewMatrix)
+                , m_projMatrix(projMatrix)
+                , m_camPos(camPos)
+            {
+                FlipYProj();
+            }
+
+        private:
             // Vulkan screen coordinates have negative Y values for the top of the screen.
             // This function will flip the Y coordinates to expected values.
             void FlipYProj()
             {
                 m_projMatrix.columns[1].y *= -1.0f;
             }
+        };
+
+        // Per Object Resources
+        struct WorldBuffer
+        {
+            Math::Matrix4x4Packed m_worldMatrix;
+            Math::Matrix4x4Packed m_inverseTransposeWorldMatrix;
         };
 
     private:
@@ -134,9 +153,12 @@ namespace DX
 
         // We need uniform buffers for each frame so they won't stumble into each other
         // while drawing the independent frames. They might have different content per frame.
-        std::vector<std::shared_ptr<Vulkan::Buffer>> m_uniformWVPBuffers;
+        std::vector<std::shared_ptr<Vulkan::Buffer>> m_viewProjUniformBuffers;
         // We need pipeline descriptor sets for each frame so they won't stumble into each other
         // while drawing the independent frames. They might have different content per frame.
+        std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perSceneDescritorSets;
+
+        std::vector<std::shared_ptr<Vulkan::Buffer>> m_worldUniformBuffers;
         std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perObjectDescritorSets;
     };
 } // namespace DX

@@ -65,7 +65,7 @@ namespace Vulkan
             return false;
         }
 
-        if (!CreateVkDescriptorSetLayout())
+        if (!CreateVkDescriptorSetLayouts())
         {
             Terminate();
             return false;
@@ -96,8 +96,11 @@ namespace Vulkan
         vkDestroyPipelineLayout(m_device->GetVkDevice(), m_vkPipelineLayout, nullptr);
         m_vkPipelineLayout = nullptr;
 
-        vkDestroyDescriptorSetLayout(m_device->GetVkDevice(), m_vkDescriptorSetLayout, nullptr);
-        m_vkDescriptorSetLayout = nullptr;
+        std::ranges::for_each(m_vkDescriptorSetLayouts, [this](VkDescriptorSetLayout vkDescriptorSetLayout)
+            {
+                vkDestroyDescriptorSetLayout(m_device->GetVkDevice(), vkDescriptorSetLayout, nullptr);
+            });
+        m_vkDescriptorSetLayouts.clear();
 
         vkDestroyRenderPass(m_device->GetVkDevice(), m_vkRenderPass, nullptr);
         m_vkRenderPass = nullptr;
@@ -113,10 +116,20 @@ namespace Vulkan
         return m_vkPipeline;
     }
 
-    std::shared_ptr<PipelineDescriptorSet> Pipeline::CreatePipelineDescriptorSet() const
+    std::shared_ptr<PipelineDescriptorSet> Pipeline::CreatePipelineDescriptorSet(uint32_t setLayoutIndex) const
     {
-        return std::make_shared<PipelineDescriptorSet>(
-            m_device, m_device->GetVkDescriptorPool(), m_vkDescriptorSetLayout, m_vkPipelineLayout);
+        if (setLayoutIndex <= m_vkDescriptorSetLayouts.size())
+        {
+            return std::make_shared<PipelineDescriptorSet>(
+                m_device, m_device->GetVkDescriptorPool(), 
+                m_vkDescriptorSetLayouts[setLayoutIndex], 
+                m_vkPipelineLayout,
+                setLayoutIndex);
+        }
+        else
+        {
+            return nullptr;
+        }
     }
 
     bool Pipeline::CreateVkRenderPass()
@@ -261,32 +274,47 @@ namespace Vulkan
         return true;
     }
 
-    bool Pipeline::CreateVkDescriptorSetLayout()
+    bool Pipeline::CreateVkDescriptorSetLayouts()
     {
         // TODO: Obtain this from the shaders.
-        // 
-        // WVP Binding Info
-        const VkDescriptorSetLayoutBinding wvpLayoutBinding = {
-            .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
-            .pImmutableSamplers = nullptr
+
+        const std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
+            // Set 0: ViewProj Binding Info
+            {
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
+                .pImmutableSamplers = nullptr
+            },
+            // Set 1: World Binding Info
+            {
+                .binding = 0,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
+                .pImmutableSamplers = nullptr
+            }
         };
 
-        // Create Descriptor Set Layout with given bindings
-        VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
-        vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
-        vkDescriptorSetLayoutCreateInfo.flags = 0;
-        vkDescriptorSetLayoutCreateInfo.bindingCount = 1;
-        vkDescriptorSetLayoutCreateInfo.pBindings = &wvpLayoutBinding;
+        m_vkDescriptorSetLayouts.resize(descriptorSetLayoutBindings.size(), nullptr);
 
-        if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(), 
-            &vkDescriptorSetLayoutCreateInfo, nullptr, &m_vkDescriptorSetLayout) != VK_SUCCESS)
+        for (size_t i = 0; i < descriptorSetLayoutBindings.size(); i++)
         {
-            DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
-            return false;
+            // Create Descriptor Set Layout with given bindings
+            VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
+            vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+            vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
+            vkDescriptorSetLayoutCreateInfo.flags = 0;
+            vkDescriptorSetLayoutCreateInfo.bindingCount = 1;
+            vkDescriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBindings[i];
+
+            if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(),
+                &vkDescriptorSetLayoutCreateInfo, nullptr, &m_vkDescriptorSetLayouts[i]) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
+                return false;
+            }
         }
 
         return true;
@@ -302,8 +330,8 @@ namespace Vulkan
         vkPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         vkPipelineLayoutCreateInfo.pNext = nullptr;
         vkPipelineLayoutCreateInfo.flags = 0;
-        vkPipelineLayoutCreateInfo.setLayoutCount = 1;
-        vkPipelineLayoutCreateInfo.pSetLayouts = &m_vkDescriptorSetLayout;
+        vkPipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(m_vkDescriptorSetLayouts.size());
+        vkPipelineLayoutCreateInfo.pSetLayouts = m_vkDescriptorSetLayouts.data();
         vkPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
         vkPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 

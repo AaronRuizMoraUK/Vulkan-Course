@@ -14,11 +14,13 @@ namespace Vulkan
         Device* device, 
         VkDescriptorPool vkDescriptorPool, 
         VkDescriptorSetLayout vkDescriptorSetLayout,
-        VkPipelineLayout vkPipelineLayout)
+        VkPipelineLayout vkPipelineLayout,
+        uint32_t setLayoutIndex)
         : m_device(device)
         , m_vkDescriptorPool(vkDescriptorPool)
         , m_vkDescriptorSetLayout(vkDescriptorSetLayout)
         , m_vkPipelineLayout(vkPipelineLayout)
+        , m_setLayoutIndex(setLayoutIndex)
     {
     }
 
@@ -61,6 +63,11 @@ namespace Vulkan
     VkPipelineLayout PipelineDescriptorSet::GetVkPipelineLayout()
     {
         return m_vkPipelineLayout;
+    }
+
+    uint32_t PipelineDescriptorSet::GetSetLayoutIndex() const
+    {
+        return m_setLayoutIndex;
     }
 
     void PipelineDescriptorSet::SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer)

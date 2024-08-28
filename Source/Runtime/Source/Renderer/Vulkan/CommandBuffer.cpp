@@ -149,7 +149,7 @@ namespace Vulkan
         vkCmdBindDescriptorSets(m_vkCommandBuffer, 
             VK_PIPELINE_BIND_POINT_GRAPHICS, 
             descriptorSet->GetVkPipelineLayout(),
-            0, // Index of first descriptor set to bind (TODO: to obtain from PipelineDescriptorSet)
+            descriptorSet->GetSetLayoutIndex(), // Index of the descriptor set inside the pipeline layout
             static_cast<uint32_t>(vkDescriptorSets.size()),
             vkDescriptorSets.data(),
             0, // Dynamic offset count

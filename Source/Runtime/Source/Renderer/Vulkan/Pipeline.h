@@ -2,6 +2,8 @@
 
 #include <Math/Rectangle.h>
 
+#include <vector>
+
 typedef struct VkRenderPass_T* VkRenderPass;
 typedef struct VkPipelineLayout_T* VkPipelineLayout;
 typedef struct VkPipeline_T* VkPipeline;
@@ -41,7 +43,7 @@ namespace Vulkan
         //       which will know how to set resources into the several descriptor sets (one per shader) or push 
         //       constants it has inside. This at the moment assumes Pipeline Layout has only 1 descriptor set
         //       and no push constants.
-        std::shared_ptr<PipelineDescriptorSet> CreatePipelineDescriptorSet() const;
+        std::shared_ptr<PipelineDescriptorSet> CreatePipelineDescriptorSet(uint32_t setLayoutIndex) const;
 
     private:
         Device* m_device = nullptr;
@@ -50,7 +52,7 @@ namespace Vulkan
 
     private:
         bool CreateVkRenderPass();
-        bool CreateVkDescriptorSetLayout();
+        bool CreateVkDescriptorSetLayouts();
         bool CreateVkPipelineLayout();
         bool CreateVkPipeline();
 
@@ -58,7 +60,7 @@ namespace Vulkan
         VkRenderPass m_vkRenderPass = nullptr;
 
         // TODO: Obtain this from the shaders.
-        VkDescriptorSetLayout m_vkDescriptorSetLayout = nullptr;
+        std::vector<VkDescriptorSetLayout> m_vkDescriptorSetLayouts;
         VkPipelineLayout m_vkPipelineLayout = nullptr;
 
         VkPipeline m_vkPipeline = nullptr;

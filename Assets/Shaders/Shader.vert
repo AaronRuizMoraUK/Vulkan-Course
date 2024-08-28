@@ -7,16 +7,21 @@ layout(location = 1) in vec4 vertexInColor;
 // Vertex Outputs
 layout(location = 0) out vec4 vertexOutColor;
 
-// Uniform Buffer Objects
-layout(set = 0, binding = 0) uniform WorldViewProjMatrixUniformBuffer
+layout(set = 0, binding = 0) uniform ViewProjUniformBuffer
 {
-    mat4 worldMatrix;
     mat4 viewMatrix;
     mat4 projMatrix;
-} wvp;
+    vec4 camPos;
+} viewProjBuffer;
+
+layout(set = 1, binding = 0) uniform WorldUniformBuffer
+{
+    mat4 worldMatrix;
+    mat4 inverseTransposeWorldMatrix;
+} worldBuffer;
 
 void main()
 {
-    gl_Position = wvp.projMatrix * wvp.viewMatrix * wvp.worldMatrix * vec4(vertexInPosition, 1.0);
+    gl_Position = viewProjBuffer.projMatrix * viewProjBuffer.viewMatrix * worldBuffer.worldMatrix * vec4(vertexInPosition, 1.0);
     vertexOutColor = vertexInColor;
 }
