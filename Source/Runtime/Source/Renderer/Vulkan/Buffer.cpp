@@ -135,11 +135,11 @@ namespace Vulkan
 
         void DestroyVkBuffer(Device* device, VkBuffer& vkBuffer, VkDeviceMemory& vkBufferMemory)
         {
-            vkFreeMemory(device->GetVkDevice(), vkBufferMemory, nullptr);
-            vkBufferMemory = nullptr;
-
             vkDestroyBuffer(device->GetVkDevice(), vkBuffer, nullptr);
             vkBuffer = nullptr;
+
+            vkFreeMemory(device->GetVkDevice(), vkBufferMemory, nullptr);
+            vkBufferMemory = nullptr;
         }
 
         bool CopyVkBuffer(Device* device, VkBuffer vkDstBuffer, VkBuffer vkSrcBuffer, size_t bufferSize)
