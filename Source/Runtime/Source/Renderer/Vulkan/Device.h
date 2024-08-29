@@ -2,12 +2,14 @@
 
 #include <array>
 #include <vector>
+#include <memory>
 
 typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkDevice_T* VkDevice;
 typedef struct VkQueue_T* VkQueue;
 typedef struct VkCommandPool_T* VkCommandPool;
 typedef struct VkDescriptorPool_T* VkDescriptorPool;
+struct VkPhysicalDeviceProperties;
 
 namespace Vulkan
 {
@@ -17,6 +19,9 @@ namespace Vulkan
     // that way it'll block until there are images available for drawing and
     // won't affect the one being presented.
     constexpr int MaxFrameDraws = 2;
+
+    // Max number of objects allowed to render. Used to allocate per-object buffers.
+    constexpr int MaxObjects = 1024;
 
     enum QueueFamilyType
     {
@@ -70,17 +75,21 @@ namespace Vulkan
         VkCommandPool GetVkCommandPool(QueueFamilyType queueFamilyType);
         VkDescriptorPool GetVkDescriptorPool();
 
+        const VkPhysicalDeviceProperties* GetVkPhysicalDeviceProperties() const;
+
         const QueueFamilyInfo& GetQueueFamilyInfo() const;
 
     private:
         Instance* m_instance = nullptr;
 
     private:
+        bool ObtainVkPhysicalDevice();
         bool CreateVkDevice();
         bool CreateVkCommandPools();
         bool CreateVkDescriptorPool();
 
         VkPhysicalDevice m_vkPhysicalDevice = nullptr;
+        std::unique_ptr<VkPhysicalDeviceProperties> m_vkPhysicalDeviceProperties;
         QueueFamilyInfo m_queueFamilyInfo;
         VkDevice m_vkDevice = nullptr;
         std::array<VkQueue, QueueFamilyType_Count> m_vkQueues;

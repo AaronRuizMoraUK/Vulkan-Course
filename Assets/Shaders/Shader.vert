@@ -14,7 +14,7 @@ layout(set = 0, binding = 0) uniform ViewProjUniformBuffer
     vec4 camPos;
 } viewProjBuffer;
 
-layout(set = 1, binding = 0) uniform WorldUniformBuffer
+layout(set = 0, binding = 1) uniform WorldUniformBuffer
 {
     mat4 worldMatrix;
     mat4 inverseTransposeWorldMatrix;

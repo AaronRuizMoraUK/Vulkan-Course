@@ -18,6 +18,35 @@
 
 namespace DX
 {
+    namespace Utils
+    {
+        void* AlignedMalloc(size_t size, size_t alignment)
+        {
+            return _aligned_malloc(size, alignment);
+        }
+
+        void AlignedFree(void* block)
+        {
+            _aligned_free(block);
+        }
+    }
+
+    Renderer::WorldBuffer* Renderer::WorldBuffer::AllocateForDynamicUniformBuffer(Vulkan::Device* device, size_t count)
+    {
+        const size_t uniformBufferAlignment = 
+            device->GetVkPhysicalDeviceProperties()->limits.minUniformBufferOffsetAlignment;
+
+        const size_t worldBufferAlignedSize = 
+            (sizeof(WorldBuffer) + uniformBufferAlignment - 1) & ~(uniformBufferAlignment - 1);
+
+        return static_cast<WorldBuffer*>(Utils::AlignedMalloc(worldBufferAlignedSize * count, uniformBufferAlignment));
+    }
+
+    void Renderer::WorldBuffer::Free(WorldBuffer* block)
+    {
+        Utils::AlignedFree(block);
+    }
+
     Renderer::Renderer(RendererId rendererId, Window* window)
         : m_rendererId(rendererId)
         , m_window(window)
@@ -90,11 +119,9 @@ namespace DX
 
         DX_LOG(Info, "Renderer", "Terminating Renderer...");
 
-        m_perObjectDescritorSets.clear();
-        m_worldUniformBuffers.clear();
-
         m_perSceneDescritorSets.clear();
         m_viewProjUniformBuffers.clear();
+        m_worldUniformBuffers.clear();
 
         if (m_device)
         {
@@ -280,26 +307,12 @@ namespace DX
 
                 commandBuffer->BindPipeline(m_pipeline.get());
 
-                // Bind per scene pipeline descriptor set, which includes the ViewProj uniform buffer
-                // The ViewProj uniform buffer is updated at the Render function every frame.
+                // Bind per scene pipeline descriptor set, which includes the ViewProj uniform buffer and
+                // World dynamic uniform buffer. Both buffers are updated at the Render function every frame.
                 commandBuffer->BindPipelineDescriptorSet(m_perSceneDescritorSets[imageIndex].get());
 
                 for (auto* object : m_objects)
                 {
-                    // The World uniform buffer is updated at the Render function every frame.
-                    // But it'll set the World matrix to the buffer once and use it
-                    // for all objects. Due to the asynchronous nature of Vulkan, rendering
-                    // using one buffer and update it with each object's data won't work, because
-                    // it's not possible to assure when the draw command for a particular object
-                    // will get executed, and waiting for each object to finish drawing would be
-                    // a very slow approach. 
-                    // 
-                    // TODO: This will be improved by using dynamic uniform buffers so each object
-                    //       can use its own world matrix.
-
-                    // Bind per object pipeline descriptor set, which includes the World uniform buffer
-                    commandBuffer->BindPipelineDescriptorSet(m_perObjectDescritorSets[imageIndex].get());
-
                     // Bind Vertex and Index Buffers
                     commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });
                     commandBuffer->BindIndexBuffer(object->GetIndexBuffer().get());
@@ -435,20 +448,36 @@ namespace DX
         // Per Scene Pipeline Descriptor Set
         {
             // ViewProj Uniform Buffers
-            Vulkan::BufferDesc bufferDesc = {};
-            bufferDesc.m_elementSizeInBytes = sizeof(ViewProjBuffer);
-            bufferDesc.m_elementCount = 1;
-            bufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
-            bufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
-            bufferDesc.m_initialData = nullptr; // ViewProj data will be set every frame to this buffer
+            Vulkan::BufferDesc viewProjBufferDesc = {};
+            viewProjBufferDesc.m_elementSizeInBytes = sizeof(ViewProjBuffer);
+            viewProjBufferDesc.m_elementCount = 1;
+            viewProjBufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
+            viewProjBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
+            viewProjBufferDesc.m_initialData = nullptr; // ViewProj data will be set every frame to this buffer
+
+            // World Uniform Buffers
+            Vulkan::BufferDesc worldBufferDesc = {};
+            worldBufferDesc.m_elementSizeInBytes = sizeof(WorldBuffer);
+            worldBufferDesc.m_elementCount = 1;
+            worldBufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
+            worldBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
+            worldBufferDesc.m_initialData = nullptr; // World data will be set every frame to this buffer
 
             m_viewProjUniformBuffers.resize(imageCount);
+            m_worldUniformBuffers.resize(imageCount);
             m_perSceneDescritorSets.resize(imageCount);
 
             for (int i = 0; i < imageCount; ++i)
             {
-                m_viewProjUniformBuffers[i] = std::make_shared<Vulkan::Buffer>(m_device.get(), bufferDesc);
+                m_viewProjUniformBuffers[i] = std::make_shared<Vulkan::Buffer>(m_device.get(), viewProjBufferDesc);
                 if (!m_viewProjUniformBuffers[i]->Initialize())
+                {
+                    DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
+                    return false;
+                }
+
+                m_worldUniformBuffers[i] = std::make_shared<Vulkan::Buffer>(m_device.get(), worldBufferDesc);
+                if (!m_worldUniformBuffers[i]->Initialize())
                 {
                     DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
                     return false;
@@ -461,42 +490,12 @@ namespace DX
                 }
 
                 // Fill the Pipeline Descriptor Sets with the Uniform Buffers
+                // 
                 // ViewProj uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
                 m_perSceneDescritorSets[i]->SetUniformBuffer(0, m_viewProjUniformBuffers[i].get());
-            }
-        }
 
-        // Per Object Pipeline Descriptor Set
-        {
-            // World Uniform Buffers
-            Vulkan::BufferDesc bufferDesc = {};
-            bufferDesc.m_elementSizeInBytes = sizeof(WorldBuffer);
-            bufferDesc.m_elementCount = 1;
-            bufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
-            bufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
-            bufferDesc.m_initialData = nullptr; // World data will be set every frame to this buffer
-
-            m_worldUniformBuffers.resize(imageCount);
-            m_perObjectDescritorSets.resize(imageCount);
-
-            for (int i = 0; i < imageCount; ++i)
-            {
-                m_worldUniformBuffers[i] = std::make_shared<Vulkan::Buffer>(m_device.get(), bufferDesc);
-                if (!m_worldUniformBuffers[i]->Initialize())
-                {
-                    DX_LOG(Error, "Renderer", "Failed to create uniform buffer for World data.");
-                    return false;
-                }
-
-                m_perObjectDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet(1);
-                if (!m_perObjectDescritorSets[i]->Initialize())
-                {
-                    return false;
-                }
-
-                // Fill the Pipeline Descriptor Sets with the Uniform Buffers
-                // World uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
-                m_perObjectDescritorSets[i]->SetUniformBuffer(0, m_worldUniformBuffers[i].get());
+                // World uniform buffer is in layout binding 1, which internally points to shader resource binding 1.
+                m_perSceneDescritorSets[i]->SetUniformBuffer(1, m_worldUniformBuffers[i].get());
             }
         }
 

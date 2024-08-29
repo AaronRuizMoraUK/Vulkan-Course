@@ -279,7 +279,7 @@ namespace Vulkan
         // TODO: Obtain this from the shaders.
 
         const std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
-            // Set 0: ViewProj Binding Info
+            // ViewProj Binding Info
             {
                 .binding = 0,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -287,9 +287,9 @@ namespace Vulkan
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
                 .pImmutableSamplers = nullptr
             },
-            // Set 1: World Binding Info
+            // World Binding Info
             {
-                .binding = 0,
+                .binding = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
@@ -297,24 +297,21 @@ namespace Vulkan
             }
         };
 
-        m_vkDescriptorSetLayouts.resize(descriptorSetLayoutBindings.size(), nullptr);
+        m_vkDescriptorSetLayouts.resize(1, nullptr);
 
-        for (size_t i = 0; i < descriptorSetLayoutBindings.size(); i++)
+        // Create Descriptor Set Layout with given bindings
+        VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
+        vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
+        vkDescriptorSetLayoutCreateInfo.flags = 0;
+        vkDescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
+        vkDescriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
+
+        if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(),
+            &vkDescriptorSetLayoutCreateInfo, nullptr, &m_vkDescriptorSetLayouts.front()) != VK_SUCCESS)
         {
-            // Create Descriptor Set Layout with given bindings
-            VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
-            vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-            vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
-            vkDescriptorSetLayoutCreateInfo.flags = 0;
-            vkDescriptorSetLayoutCreateInfo.bindingCount = 1;
-            vkDescriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBindings[i];
-
-            if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(),
-                &vkDescriptorSetLayoutCreateInfo, nullptr, &m_vkDescriptorSetLayouts[i]) != VK_SUCCESS)
-            {
-                DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
-                return false;
-            }
+            DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
+            return false;
         }
 
         return true;

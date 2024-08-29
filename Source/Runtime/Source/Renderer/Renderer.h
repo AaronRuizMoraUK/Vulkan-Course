@@ -103,6 +103,9 @@ namespace DX
         {
             Math::Matrix4x4Packed m_worldMatrix;
             Math::Matrix4x4Packed m_inverseTransposeWorldMatrix;
+
+            static WorldBuffer* AllocateForDynamicUniformBuffer(Vulkan::Device* device, size_t count);
+            static void Free(WorldBuffer*);
         };
 
     private:
@@ -154,11 +157,9 @@ namespace DX
         // We need uniform buffers for each frame so they won't stumble into each other
         // while drawing the independent frames. They might have different content per frame.
         std::vector<std::shared_ptr<Vulkan::Buffer>> m_viewProjUniformBuffers;
+        std::vector<std::shared_ptr<Vulkan::Buffer>> m_worldUniformBuffers;
         // We need pipeline descriptor sets for each frame so they won't stumble into each other
         // while drawing the independent frames. They might have different content per frame.
         std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perSceneDescritorSets;
-
-        std::vector<std::shared_ptr<Vulkan::Buffer>> m_worldUniformBuffers;
-        std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perObjectDescritorSets;
     };
 } // namespace DX

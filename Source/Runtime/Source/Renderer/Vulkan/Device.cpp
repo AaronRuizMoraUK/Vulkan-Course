@@ -10,9 +10,16 @@
 
 #include <unordered_set>
 #include <algorithm>
+#include <span>
 
 namespace Vulkan
 {
+    // Vulkan device extensions that physical device must support
+    static const std::array<const char* const, 1> VkDeviceExtensions =
+    {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+
     // Utils to extract information and perform checks on Vulkan Physical Devices
     namespace Utils
     {
@@ -83,7 +90,7 @@ namespace Vulkan
             return queueFamilyInfo;
         }
 
-        bool VkDeviceExtensionsSupported(VkPhysicalDevice vkPhysicalDevice, const std::vector<const char*>& extensions)
+        bool VkDeviceExtensionsSupported(VkPhysicalDevice vkPhysicalDevice, std::span<const char* const> extensions)
         {
             const std::vector<VkExtensionProperties> extensionsProperties = [vkPhysicalDevice]()
                 {
@@ -108,7 +115,7 @@ namespace Vulkan
             }
 
             return std::all_of(extensions.begin(), extensions.end(),
-                [&extensionsProperties](const char* extension)
+                [&extensionsProperties](const char* const extension)
                 {
                     return std::find_if(extensionsProperties.begin(), extensionsProperties.end(),
                     [extension](const VkExtensionProperties& extensionProperties)
@@ -121,7 +128,7 @@ namespace Vulkan
         bool CheckVkPhysicalDeviceSuitable(
             VkPhysicalDevice vkPhysicalDevice,
             VkSurfaceKHR vkSurface,
-            const std::vector<const char*>& extensions)
+            std::span<const char* const> extensions)
         {
             // Information about the device itself (ID, name, type, vendor, etc.)
             //VkPhysicalDeviceProperties vkPhysicalDeviceProperties;
@@ -180,6 +187,12 @@ namespace Vulkan
 
         DX_LOG(Info, "Vulkan Device", "Initializing Vulkan Device...");
 
+        if (!ObtainVkPhysicalDevice())
+        {
+            Terminate();
+            return false;
+        }
+
         if (!CreateVkDevice())
         {
             Terminate();
@@ -218,6 +231,7 @@ namespace Vulkan
         m_vkDevice = nullptr;
         m_queueFamilyInfo = QueueFamilyInfo();
         m_vkQueues.fill(nullptr);
+        m_vkPhysicalDeviceProperties.reset();
         m_vkPhysicalDevice = nullptr;
     }
 
@@ -264,66 +278,67 @@ namespace Vulkan
         return m_queueFamilyInfo;
     }
 
-    bool Device::CreateVkDevice()
+    const VkPhysicalDeviceProperties* Device::GetVkPhysicalDeviceProperties() const
     {
-        // Vulkan device extensions that physical device must support
-        const std::vector<const char*> vkDeviceExtensions =
+        return m_vkPhysicalDeviceProperties.get();
+    }
+
+    bool Device::ObtainVkPhysicalDevice()
+    {
+        // Physical devices that the Vulkan instance can access
+        const std::vector<VkPhysicalDevice> physicalDevices = [this]()
+            {
+                uint32_t physicalDeviceCount = 0;
+                vkEnumeratePhysicalDevices(m_instance->GetVkInstance(), &physicalDeviceCount, nullptr);
+
+                std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
+                vkEnumeratePhysicalDevices(m_instance->GetVkInstance(), &physicalDeviceCount, physicalDevices.data());
+
+                return physicalDevices;
+            }();
+
+        if (physicalDevices.empty())
         {
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME
-        };
-
-        // Physical Device
+            DX_LOG(Error, "Vulkan Device", "No physical devices found that support Vulkan instance.");
+            return false;
+        }
+        DX_LOG(Verbose, "Vulkan Device", "Physical Devices found: %d", physicalDevices.size());
+        for (const auto& physicalDevice : physicalDevices)
         {
-            // Physical devices that the Vulkan instance can access
-            const std::vector<VkPhysicalDevice> physicalDevices = [this]()
-                {
-                    uint32_t physicalDeviceCount = 0;
-                    vkEnumeratePhysicalDevices(m_instance->GetVkInstance(), &physicalDeviceCount, nullptr);
-
-                    std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
-                    vkEnumeratePhysicalDevices(m_instance->GetVkInstance(), &physicalDeviceCount, physicalDevices.data());
-
-                    return physicalDevices;
-                }();
-
-            if (physicalDevices.empty())
-            {
-                DX_LOG(Error, "Vulkan Device", "No physical devices found that support Vulkan instance.");
-                return false;
-            }
-            DX_LOG(Verbose, "Vulkan Device", "Physical Devices found: %d", physicalDevices.size());
-            for (const auto& physicalDevice : physicalDevices)
-            {
-                VkPhysicalDeviceProperties physicalDeviceProperties;
-                vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
-                DX_LOG(Verbose, "Vulkan Device", "\t- %s", physicalDeviceProperties.deviceName);
-            }
-
-            // Use first suitable Vulkan physical device
-            auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
-                [this, &vkDeviceExtensions](VkPhysicalDevice physicalDevice)
-                {
-                    return Utils::CheckVkPhysicalDeviceSuitable(physicalDevice, m_instance->GetVkSurface(), vkDeviceExtensions);
-                });
-            if (physicalDeviceIt == physicalDevices.end())
-            {
-                DX_LOG(Error, "Vulkan Device", "No suitable physical device found in Vulkan instance.");
-                return false;
-            }
-
-            m_vkPhysicalDevice = *physicalDeviceIt;
-
             VkPhysicalDeviceProperties physicalDeviceProperties;
-            vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, &physicalDeviceProperties);
-            DX_LOG(Verbose, "Vulkan Device", "Physical Device used: %s", physicalDeviceProperties.deviceName);
-
-            DX_LOG(Verbose, "Vulkan Device", "Vulkan device extensions to enable: %d", vkDeviceExtensions.size());
-            for (const auto& vkDeviceExtension : vkDeviceExtensions)
-            {
-                DX_LOG(Verbose, "Vulkan Device", "\t- %s", vkDeviceExtension);
-            }
+            vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+            DX_LOG(Verbose, "Vulkan Device", "\t- %s", physicalDeviceProperties.deviceName);
         }
 
+        // Use first suitable Vulkan physical device
+        auto physicalDeviceIt = std::find_if(physicalDevices.begin(), physicalDevices.end(),
+            [this](VkPhysicalDevice physicalDevice)
+            {
+                return Utils::CheckVkPhysicalDeviceSuitable(physicalDevice, m_instance->GetVkSurface(), VkDeviceExtensions);
+            });
+        if (physicalDeviceIt == physicalDevices.end())
+        {
+            DX_LOG(Error, "Vulkan Device", "No suitable physical device found in Vulkan instance.");
+            return false;
+        }
+
+        m_vkPhysicalDevice = *physicalDeviceIt;
+
+        m_vkPhysicalDeviceProperties = std::make_unique<VkPhysicalDeviceProperties>();
+        vkGetPhysicalDeviceProperties(m_vkPhysicalDevice, m_vkPhysicalDeviceProperties.get());
+        DX_LOG(Verbose, "Vulkan Device", "Physical Device used: %s", m_vkPhysicalDeviceProperties->deviceName);
+
+        DX_LOG(Verbose, "Vulkan Device", "Vulkan device extensions to enable: %d", VkDeviceExtensions.size());
+        for (const auto& vkDeviceExtension : VkDeviceExtensions)
+        {
+            DX_LOG(Verbose, "Vulkan Device", "\t- %s", vkDeviceExtension);
+        }
+
+        return true;
+    }
+
+    bool Device::CreateVkDevice()
+    {
         // Queue Family information of the physical device.
         m_queueFamilyInfo = Utils::EnumerateQueueFamilies(m_vkPhysicalDevice, m_instance->GetVkSurface());
         DX_ASSERT(m_queueFamilyInfo.IsValid(), "Vulkan Device", "Queue Family Indices is not valid");
@@ -360,8 +375,8 @@ namespace Vulkan
         vkDeviceCreateInfo.pQueueCreateInfos = deviceQueuesCreateInfo.data();
         vkDeviceCreateInfo.enabledLayerCount = 0; // Deprecated in Vulkan 1.1
         vkDeviceCreateInfo.ppEnabledLayerNames = nullptr; // Deprecated in Vulkan 1.1
-        vkDeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(vkDeviceExtensions.size());
-        vkDeviceCreateInfo.ppEnabledExtensionNames = vkDeviceExtensions.data();
+        vkDeviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(VkDeviceExtensions.size());
+        vkDeviceCreateInfo.ppEnabledExtensionNames = VkDeviceExtensions.data();
         vkDeviceCreateInfo.pEnabledFeatures = &vkPhysicalDeviceFeatures;
 
         if (vkCreateDevice(m_vkPhysicalDevice, &vkDeviceCreateInfo, nullptr, &m_vkDevice) != VK_SUCCESS)
@@ -418,7 +433,7 @@ namespace Vulkan
         constexpr int tempMaxFrameDraws = 3;
 
         // Increase max counts as needed
-        constexpr int maxDescriptorSetsPerFrame = 2;
+        constexpr int maxDescriptorSetsPerFrame = 1;
         constexpr int maxUniformBufferDescriptorsPerFrame = 2;
 
         // Max number of descriptor sets in the pool.
