@@ -5,13 +5,13 @@
 
 typedef struct VkDescriptorSet_T* VkDescriptorSet;
 typedef struct VkDescriptorPool_T* VkDescriptorPool;
-typedef struct VkDescriptorSetLayout_T* VkDescriptorSetLayout;
 typedef struct VkPipelineLayout_T* VkPipelineLayout;
 
 namespace Vulkan
 {
     class Device;
     class Buffer;
+    struct DescriptorSetLayout;
 
     // Manages a Pipeline Descriptor Set
     class PipelineDescriptorSet
@@ -20,8 +20,8 @@ namespace Vulkan
         PipelineDescriptorSet(
             Device* device, 
             VkDescriptorPool vkDescriptorPool, 
-            VkDescriptorSetLayout vkDescriptorSetLayout,
-            VkPipelineLayout vkPipelineLayout,
+            const DescriptorSetLayout* descriptorSetLayout,
+            const VkPipelineLayout vkPipelineLayout,
             uint32_t setLayoutIndex);
         ~PipelineDescriptorSet();
 
@@ -32,16 +32,18 @@ namespace Vulkan
         void Terminate();
 
         VkDescriptorSet GetVkDescriptorSet();
-        VkPipelineLayout GetVkPipelineLayout();
+        const DescriptorSetLayout* GetDescriptorSetLayout() const;
+        const VkPipelineLayout GetVkPipelineLayout() const;
         uint32_t GetSetLayoutIndex() const;
 
         void SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer);
+        void SetUniformBufferDynamic(uint32_t layoutBinding, Buffer* buffer);
 
     private:
         Device* m_device = nullptr;
         VkDescriptorPool m_vkDescriptorPool = nullptr;
-        VkDescriptorSetLayout m_vkDescriptorSetLayout = nullptr;
-        VkPipelineLayout m_vkPipelineLayout = nullptr;
+        const DescriptorSetLayout* m_descriptorSetLayout = nullptr;
+        const VkPipelineLayout m_vkPipelineLayout = nullptr;
         uint32_t m_setLayoutIndex = std::numeric_limits<uint32_t>::max(); // Index of this descriptor set layout inside the pipeline layout
 
     private:

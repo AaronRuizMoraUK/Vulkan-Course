@@ -2,6 +2,7 @@
 
 #include <Renderer/Vulkan/Device.h>
 #include <Renderer/Vulkan/Buffer.h>
+#include <Renderer/Vulkan/Pipeline.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -13,12 +14,12 @@ namespace Vulkan
     PipelineDescriptorSet::PipelineDescriptorSet(
         Device* device, 
         VkDescriptorPool vkDescriptorPool, 
-        VkDescriptorSetLayout vkDescriptorSetLayout,
-        VkPipelineLayout vkPipelineLayout,
+        const DescriptorSetLayout* descriptorSetLayout,
+        const VkPipelineLayout vkPipelineLayout,
         uint32_t setLayoutIndex)
         : m_device(device)
         , m_vkDescriptorPool(vkDescriptorPool)
-        , m_vkDescriptorSetLayout(vkDescriptorSetLayout)
+        , m_descriptorSetLayout(descriptorSetLayout)
         , m_vkPipelineLayout(vkPipelineLayout)
         , m_setLayoutIndex(setLayoutIndex)
     {
@@ -60,7 +61,12 @@ namespace Vulkan
         return m_vkDescriptorSet;
     }
 
-    VkPipelineLayout PipelineDescriptorSet::GetVkPipelineLayout()
+    const DescriptorSetLayout* PipelineDescriptorSet::GetDescriptorSetLayout() const
+    {
+        return m_descriptorSetLayout;
+    }
+
+    const VkPipelineLayout PipelineDescriptorSet::GetVkPipelineLayout() const
     {
         return m_vkPipelineLayout;
     }
@@ -72,6 +78,9 @@ namespace Vulkan
 
     void PipelineDescriptorSet::SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer)
     {
+        // TODO: Once bindings are included in Descriptor Set Layout, this could validate
+        //       that the layoutBinding is expecting a uniform buffer.
+
         // Descriptor for the buffer (aka a Buffer View)
         // View to the entire buffer.
         const VkDescriptorBufferInfo vkDescriptorBufferInfo = {
@@ -100,6 +109,39 @@ namespace Vulkan
             0, nullptr); // For copying descriptor sets to other descriptor sets
     }
 
+    void PipelineDescriptorSet::SetUniformBufferDynamic(uint32_t layoutBinding, Buffer* buffer)
+    {
+        // TODO: Once bindings are included in Descriptor Set Layout, this could validate
+        //       that the layoutBinding is expecting a uniform buffer dynamic.
+
+        // Descriptor for the buffer (aka a Buffer View)
+        // View of 1 element and not of the entire buffer (many objects)
+        const VkDescriptorBufferInfo vkDescriptorBufferInfo = {
+            .buffer = buffer->GetVkBuffer(),
+            .offset = 0,
+            .range = buffer->GetBufferDesc().m_elementSizeInBytes
+        };
+
+        VkWriteDescriptorSet vkWriteDescriptorSet = {};
+        vkWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vkWriteDescriptorSet.pNext = nullptr;
+        vkWriteDescriptorSet.dstSet = m_vkDescriptorSet;
+        // Binding index from VkDescriptorSetLayoutCreateInfo.pBindings list.
+        // This is not the "binding" attribute from the shader, that's specified
+        // inside each element of the list.
+        vkWriteDescriptorSet.dstBinding = layoutBinding;
+        vkWriteDescriptorSet.dstArrayElement = 0; // If layout binding contains an array, index in array to update.
+        vkWriteDescriptorSet.descriptorCount = 1; // How many descriptors (elements in pBufferInfo) we are setting.
+        vkWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+        vkWriteDescriptorSet.pImageInfo = nullptr;
+        vkWriteDescriptorSet.pBufferInfo = &vkDescriptorBufferInfo;
+        vkWriteDescriptorSet.pTexelBufferView = nullptr;
+
+        vkUpdateDescriptorSets(m_device->GetVkDevice(),
+            1, &vkWriteDescriptorSet,
+            0, nullptr); // For copying descriptor sets to other descriptor sets
+    }
+
     bool PipelineDescriptorSet::CreateVkDescriptorSet()
     {
         VkDescriptorSetAllocateInfo vkDescriptorSetAllocateInfo = {};
@@ -107,7 +149,7 @@ namespace Vulkan
         vkDescriptorSetAllocateInfo.pNext = nullptr;
         vkDescriptorSetAllocateInfo.descriptorPool = m_vkDescriptorPool;
         vkDescriptorSetAllocateInfo.descriptorSetCount = 1;
-        vkDescriptorSetAllocateInfo.pSetLayouts = &m_vkDescriptorSetLayout;
+        vkDescriptorSetAllocateInfo.pSetLayouts = &m_descriptorSetLayout->m_vkDescriptorSetLayout;
 
         if (vkAllocateDescriptorSets(
             m_device->GetVkDevice(), &vkDescriptorSetAllocateInfo, &m_vkDescriptorSet) != VK_SUCCESS)

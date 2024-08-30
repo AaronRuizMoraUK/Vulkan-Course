@@ -14,6 +14,12 @@ namespace Vulkan
     class Device;
     class PipelineDescriptorSet;
 
+    struct DescriptorSetLayout
+    {
+        VkDescriptorSetLayout m_vkDescriptorSetLayout = nullptr;
+        uint32_t m_numDynamicDescriptors = 0;
+    };
+
     // Manages the Vulkan graphics pipeline
     class Pipeline
     {
@@ -40,9 +46,7 @@ namespace Vulkan
         // resources, other for per material resources and other for per object resources.
         //
         // TODO: This is only a part of the pipeline layout. Ideally this should be CreatePipelineLayoutObject,
-        //       which will know how to set resources into the several descriptor sets (one per shader) or push 
-        //       constants it has inside. This at the moment assumes Pipeline Layout has only 1 descriptor set
-        //       and no push constants.
+        //       which will know how to set resources into the several descriptor sets or push constants it has inside.
         std::shared_ptr<PipelineDescriptorSet> CreatePipelineDescriptorSet(uint32_t setLayoutIndex) const;
 
     private:
@@ -60,7 +64,7 @@ namespace Vulkan
         VkRenderPass m_vkRenderPass = nullptr;
 
         // TODO: Obtain this from the shaders.
-        std::vector<VkDescriptorSetLayout> m_vkDescriptorSetLayouts;
+        std::vector<std::unique_ptr<DescriptorSetLayout>> m_descriptorSetLayouts;
         VkPipelineLayout m_vkPipelineLayout = nullptr;
 
         VkPipeline m_vkPipeline = nullptr;

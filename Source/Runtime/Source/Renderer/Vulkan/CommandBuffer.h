@@ -51,6 +51,7 @@ namespace Vulkan
         void BindPipeline(Pipeline* pipeline);
 
         void BindPipelineDescriptorSet(PipelineDescriptorSet* descriptorSet);
+        void BindPipelineDescriptorSet(PipelineDescriptorSet* descriptorSet, const std::vector<uint32_t>& dynamicOffsetsInBytes);
 
         void BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers);
         void BindIndexBuffer(Buffer* indexBuffer);

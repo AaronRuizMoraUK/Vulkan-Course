@@ -156,6 +156,32 @@ namespace Vulkan
             nullptr);
     }
 
+    void CommandBuffer::BindPipelineDescriptorSet(
+        PipelineDescriptorSet* descriptorSet, 
+        const std::vector<uint32_t>& dynamicOffsetsInBytes)
+    {
+        if (dynamicOffsetsInBytes.size() != descriptorSet->GetDescriptorSetLayout()->m_numDynamicDescriptors)
+        {
+            DX_LOG(Error, "CommandBuffer", 
+                "Number of dynamic descriptors in set layout (%d) does not match the number of dynamic offsets passed (%d).",
+                descriptorSet->GetDescriptorSetLayout()->m_numDynamicDescriptors, dynamicOffsetsInBytes.size());
+            return;
+        }
+
+        const std::vector<VkDescriptorSet> vkDescriptorSets = {
+            descriptorSet->GetVkDescriptorSet()
+        };
+
+        vkCmdBindDescriptorSets(m_vkCommandBuffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            descriptorSet->GetVkPipelineLayout(),
+            descriptorSet->GetSetLayoutIndex(), // Index of the descriptor set inside the pipeline layout
+            static_cast<uint32_t>(vkDescriptorSets.size()),
+            vkDescriptorSets.data(),
+            static_cast<uint32_t>(dynamicOffsetsInBytes.size()), // Dynamic offset count
+            dynamicOffsetsInBytes.data());
+    }
+
     void CommandBuffer::BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers)
     {
         std::vector<VkBuffer> vkVertexBuffers(vertexBuffers.size());

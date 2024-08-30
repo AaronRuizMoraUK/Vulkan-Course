@@ -13,17 +13,17 @@ namespace DX
     namespace Quad
     {
         static const std::vector<VertexPC> VertexData1 = {
-            { Math::Vector3Packed({-0.1f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Red) },
-            { Math::Vector3Packed({-0.1f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Green) },
-            { Math::Vector3Packed({-0.9f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Blue) },
-            { Math::Vector3Packed({-0.9f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Yellow) },
+            { Math::Vector3Packed({0.4f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Red) },
+            { Math::Vector3Packed({0.4f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Green) },
+            { Math::Vector3Packed({-0.4f, 0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Blue) },
+            { Math::Vector3Packed({-0.4f,-0.4f, 0.0f}), Math::ColorPacked(Math::Colors::Yellow) },
         };
 
         static const std::vector<VertexPC> VertexData2 = {
-            { Math::Vector3Packed({0.9f,-0.3f, 0.0f}), Math::ColorPacked(Math::Colors::Red) },
-            { Math::Vector3Packed({0.9f, 0.1f, 0.0f}), Math::ColorPacked(Math::Colors::Green) },
-            { Math::Vector3Packed({0.1f, 0.3f, 0.0f}), Math::ColorPacked(Math::Colors::Blue) },
-            { Math::Vector3Packed({0.1f,-0.3f, 0.0f}), Math::ColorPacked(Math::Colors::Yellow) },
+            { Math::Vector3Packed({0.25f,-0.6f, 0.0f}), Math::ColorPacked(Math::Colors::Red) },
+            { Math::Vector3Packed({0.25f, 0.6f, 0.0f}), Math::ColorPacked(Math::Colors::Green) },
+            { Math::Vector3Packed({-0.25f, 0.6f, 0.0f}), Math::ColorPacked(Math::Colors::Blue) },
+            { Math::Vector3Packed({-0.25f,-0.6f, 0.0f}), Math::ColorPacked(Math::Colors::Yellow) },
         };
 
         static const std::vector<Index> IndexData = { 
@@ -58,18 +58,22 @@ namespace DX
         }
 
         // Camera
-        //m_camera = std::make_unique<Camera>(Math::Vector3(0.0f, 2.0f, -2.0f), Math::Vector3(0.0f, 1.0f, 0.0f));
         m_camera = std::make_unique<Camera>(Math::Vector3(0.0f, 0.0f, 2.0f), Math::Vector3(0.0f, 0.0f, 0.0f));
 
         m_renderer->SetCamera(m_camera.get());
 
         // Prepare render objects
         m_objects.push_back(std::make_unique<SimpleObject>(
-            Math::Transform::CreateIdentity(), Quad::VertexData1, Quad::IndexData));
+            Math::Transform{ {2.0f, 0.0f, 0.0f}, Math::Quaternion::FromEulerAngles({ 0.0f, 0.0f, 3.14f/4.0f }) }, 
+            Quad::VertexData1, Quad::IndexData));
         m_objects.push_back(std::make_unique<SimpleObject>(
-            Math::Transform::CreateIdentity(), Quad::VertexData2, Quad::IndexData));
+            Math::Transform{ {1.0f, 1.0f, 0.0f} }, Quad::VertexData2, Quad::IndexData));
         m_objects.push_back(std::make_unique<Cube>(
-            Math::Transform::CreateIdentity(), Math::Vector3(1.0f)));
+            Math::Transform{ {0.0f, 0.0f, 0.0f} }, Math::Vector3(1.0f)));
+        m_objects.push_back(std::make_unique<Cube>(
+            Math::Transform{ {-2.0f, 0.0f, 0.0f} }, Math::Vector3(1.0f)));
+        m_objects.push_back(std::make_unique<Cube>(
+            Math::Transform{ {-3.0f, 1.0f, 0.0f} }, Math::Vector3(1.0f)));
 
         std::ranges::for_each(m_objects, [this](auto& object) { m_renderer->AddObject(object.get()); });
 
@@ -99,6 +103,11 @@ namespace DX
             // Update
             // ------
             m_camera->Update(deltaTime);
+            for (auto& object : m_objects)
+            {
+                Math::Transform& transform = object->GetTransform();
+                transform.m_rotation = Math::Quaternion::FromEulerAngles(Math::Vector3(0.0f, 0.5f * deltaTime, 0.0f)) * transform.m_rotation;
+            }
 
             // ------
             // Render

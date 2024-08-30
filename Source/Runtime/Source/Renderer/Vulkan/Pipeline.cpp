@@ -9,6 +9,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include <numeric>
+
 namespace Vulkan
 {
     namespace Utils
@@ -35,6 +37,22 @@ namespace Vulkan
             }
 
             return true;
+        }
+
+        bool IsDescriptorTypeDynamic(VkDescriptorType type)
+        {
+            return type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC
+                || type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
+        }
+
+        uint32_t GetDynamicDescritorCount(const std::vector<VkDescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
+        {
+            return std::reduce(descriptorSetLayoutBindings.begin(), descriptorSetLayoutBindings.end(), 0u,
+                [](uint32_t accumulator, const VkDescriptorSetLayoutBinding& binding)
+                {
+                    return accumulator +
+                        IsDescriptorTypeDynamic(binding.descriptorType) ? binding.descriptorCount : 0u;
+                });
         }
     } // namespace Utils
 
@@ -96,11 +114,11 @@ namespace Vulkan
         vkDestroyPipelineLayout(m_device->GetVkDevice(), m_vkPipelineLayout, nullptr);
         m_vkPipelineLayout = nullptr;
 
-        std::ranges::for_each(m_vkDescriptorSetLayouts, [this](VkDescriptorSetLayout vkDescriptorSetLayout)
+        std::ranges::for_each(m_descriptorSetLayouts, [this](std::unique_ptr<DescriptorSetLayout>& descriptorSetLayout)
             {
-                vkDestroyDescriptorSetLayout(m_device->GetVkDevice(), vkDescriptorSetLayout, nullptr);
+                vkDestroyDescriptorSetLayout(m_device->GetVkDevice(), descriptorSetLayout->m_vkDescriptorSetLayout, nullptr);
             });
-        m_vkDescriptorSetLayouts.clear();
+        m_descriptorSetLayouts.clear();
 
         vkDestroyRenderPass(m_device->GetVkDevice(), m_vkRenderPass, nullptr);
         m_vkRenderPass = nullptr;
@@ -118,11 +136,11 @@ namespace Vulkan
 
     std::shared_ptr<PipelineDescriptorSet> Pipeline::CreatePipelineDescriptorSet(uint32_t setLayoutIndex) const
     {
-        if (setLayoutIndex <= m_vkDescriptorSetLayouts.size())
+        if (setLayoutIndex <= m_descriptorSetLayouts.size())
         {
             return std::make_shared<PipelineDescriptorSet>(
                 m_device, m_device->GetVkDescriptorPool(), 
-                m_vkDescriptorSetLayouts[setLayoutIndex], 
+                m_descriptorSetLayouts[setLayoutIndex].get(),
                 m_vkPipelineLayout,
                 setLayoutIndex);
         }
@@ -290,14 +308,16 @@ namespace Vulkan
             // World Binding Info
             {
                 .binding = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
                 .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
                 .pImmutableSamplers = nullptr
             }
         };
 
-        m_vkDescriptorSetLayouts.resize(1, nullptr);
+        auto descriptorSetLayout = std::make_unique<DescriptorSetLayout>();
+
+        descriptorSetLayout->m_numDynamicDescriptors = Utils::GetDynamicDescritorCount(descriptorSetLayoutBindings);
 
         // Create Descriptor Set Layout with given bindings
         VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
@@ -308,11 +328,14 @@ namespace Vulkan
         vkDescriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
 
         if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(),
-            &vkDescriptorSetLayoutCreateInfo, nullptr, &m_vkDescriptorSetLayouts.front()) != VK_SUCCESS)
+            &vkDescriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout->m_vkDescriptorSetLayout) != VK_SUCCESS)
         {
             DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
             return false;
         }
+
+        m_descriptorSetLayouts.clear();
+        m_descriptorSetLayouts.push_back(std::move(descriptorSetLayout));
 
         return true;
     }
@@ -321,14 +344,21 @@ namespace Vulkan
     {
         // TODO: Obtain this from the shaders.
 
+        std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts(m_descriptorSetLayouts.size(), nullptr);
+        std::transform(m_descriptorSetLayouts.begin(), m_descriptorSetLayouts.end(), vkDescriptorSetLayouts.begin(),
+            [](std::unique_ptr<DescriptorSetLayout>& descriptorSetLayout)
+            {
+                return descriptorSetLayout->m_vkDescriptorSetLayout;
+            });
+
         // Create Pipeline Layout (Resources Layout)
         // Where to specify Descriptor Set Layouts and Push Constant Ranges.
         VkPipelineLayoutCreateInfo vkPipelineLayoutCreateInfo = {};
         vkPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         vkPipelineLayoutCreateInfo.pNext = nullptr;
         vkPipelineLayoutCreateInfo.flags = 0;
-        vkPipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(m_vkDescriptorSetLayouts.size());
-        vkPipelineLayoutCreateInfo.pSetLayouts = m_vkDescriptorSetLayouts.data();
+        vkPipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(vkDescriptorSetLayouts.size());
+        vkPipelineLayoutCreateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
         vkPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
         vkPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 
