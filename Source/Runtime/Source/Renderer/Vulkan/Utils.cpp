@@ -25,4 +25,21 @@ namespace Vulkan
         return vkCommandBufferUsageFlags;
     }
 
+    VkShaderStageFlags ToVkShaderStageFlags(ShaderType shaderType)
+    {
+        switch (shaderType)
+        {
+        case ShaderType_Vertex:                return VK_SHADER_STAGE_VERTEX_BIT;
+        case ShaderType_TesselationControl:    return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+        case ShaderType_TesselationEvaluation: return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+        case ShaderType_Geometry:              return VK_SHADER_STAGE_GEOMETRY_BIT;
+        case ShaderType_Fragment:              return VK_SHADER_STAGE_FRAGMENT_BIT;
+        case ShaderType_Compute:               return VK_SHADER_STAGE_COMPUTE_BIT;
+
+        case ShaderType_Unknown:
+        default:
+            return 0;
+        }
+    }
+
 } // namespace Vulkan

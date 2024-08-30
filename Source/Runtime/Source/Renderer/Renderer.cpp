@@ -18,78 +18,6 @@
 
 namespace DX
 {
-    namespace Utils
-    {
-        void* AlignedMalloc(size_t size, size_t alignment)
-        {
-            return _aligned_malloc(size, alignment);
-        }
-
-        void AlignedFree(void* block)
-        {
-            _aligned_free(block);
-        }
-    }
-
-    size_t Renderer::AlignedWorldBuffers::SizeAlignedForDynamicUniformBuffer(Vulkan::Device* device)
-    {
-        const size_t uniformBufferAlignment =
-            device->GetVkPhysicalDeviceProperties()->limits.minUniformBufferOffsetAlignment;
-
-        // Size of a world buffer aligned to the offset alignment that dynamic uniform buffers must have.
-        const size_t worldBufferAlignedSize =
-            (sizeof(WorldBuffer) + uniformBufferAlignment - 1) & ~(uniformBufferAlignment - 1);
-
-        return worldBufferAlignedSize;
-    }
-
-    Renderer::AlignedWorldBuffers::AlignedWorldBuffers(Vulkan::Device* device, size_t worldBufferCount)
-        : m_device(device)
-        , m_worldBufferCount(worldBufferCount)
-    {
-        DX_ASSERT(m_worldBufferCount <= Vulkan::MaxObjects, "Renderer",
-            "Number of buffers (%d) is greater than maximum number of objects allowed (%d).",
-            m_worldBufferCount, Vulkan::MaxObjects);
-
-        AllocateData();
-    }
-
-    Renderer::AlignedWorldBuffers::~AlignedWorldBuffers()
-    {
-        FreeData();
-    }
-
-    Renderer::WorldBuffer* Renderer::AlignedWorldBuffers::GetWorldBuffer(size_t index)
-    {
-        return (index < m_worldBufferCount)
-            ? reinterpret_cast<WorldBuffer*>(m_data + index * m_worldBufferAlignedSize)
-            : nullptr;
-    }
-
-
-    size_t Renderer::AlignedWorldBuffers::GetWorldBufferAlignedSize() const
-    {
-        return m_worldBufferAlignedSize;
-    }
-
-    const uint8_t* Renderer::AlignedWorldBuffers::GetData() const
-    {
-        return m_data;
-    }
-
-    void Renderer::AlignedWorldBuffers::AllocateData()
-    {
-        m_worldBufferAlignedSize = SizeAlignedForDynamicUniformBuffer(m_device);
-
-        // To be safe that assignments to members will work without issues, align the memory to the aligned size.
-        m_data = static_cast<uint8_t*>(Utils::AlignedMalloc(m_worldBufferAlignedSize * m_worldBufferCount, m_worldBufferAlignedSize));
-    }
-
-    void Renderer::AlignedWorldBuffers::FreeData()
-    {
-        Utils::AlignedFree(m_data);
-    }
-
     Renderer::Renderer(RendererId rendererId, Window* window)
         : m_rendererId(rendererId)
         , m_window(window)
@@ -162,9 +90,7 @@ namespace DX
 
         DX_LOG(Info, "Renderer", "Terminating Renderer...");
 
-        m_perObjectDescritorSets.clear();
-        m_alignedWorldBuffersData.clear();
-        m_worldUniformBuffers.clear();
+        m_perSceneDescritorSets.clear();
         m_viewProjUniformBuffers.clear();
         m_commandBuffers.clear();
 
@@ -323,31 +249,12 @@ namespace DX
     void Renderer::UpdateFrameData()
     {
         // Update ViewProj uniform buffer
-        {
-            const ViewProjBuffer viewProjBuffer(
-                m_camera->GetViewMatrix(),
-                m_camera->GetProjectionMatrix(),
-                Math::Vector4{ m_camera->GetTransform().m_position, 1.0f }
-            );
-            m_viewProjUniformBuffers[m_currentFrame]->UpdateBufferData(&viewProjBuffer, sizeof(viewProjBuffer));
-        }
-
-        // Update world uniform buffer dynamic with all objects' matrices
-        {
-            for (uint32_t objectIndex = 0;
-                auto * object : m_objects)
-            {
-                WorldBuffer* worldBuffer = m_alignedWorldBuffersData[m_currentFrame]->GetWorldBuffer(objectIndex);
-                worldBuffer->m_worldMatrix = object->GetTransform().ToMatrix();
-                worldBuffer->m_inverseTransposeWorldMatrix = object->GetTransform().ToMatrix().Inverse().Transpose();
-
-                ++objectIndex;
-            }
-
-            m_worldUniformBuffers[m_currentFrame]->UpdateBufferData(
-                m_alignedWorldBuffersData[m_currentFrame]->GetData(),
-                m_alignedWorldBuffersData[m_currentFrame]->GetWorldBufferAlignedSize() * m_objects.size());
-        }
+        const ViewProjBuffer viewProjBuffer(
+            m_camera->GetViewMatrix(),
+            m_camera->GetProjectionMatrix(),
+            Math::Vector4{ m_camera->GetTransform().m_position, 1.0f }
+        );
+        m_viewProjUniformBuffers[m_currentFrame]->UpdateBufferData(&viewProjBuffer, sizeof(viewProjBuffer));
     }
 
     void Renderer::RecordCommands(Vulkan::FrameBuffer* frameBuffer)
@@ -361,17 +268,19 @@ namespace DX
 
             commandBuffer->BindPipeline(m_pipeline.get());
 
-            const uint32_t worldBufferAlignedSize = 
-                static_cast<uint32_t>(m_alignedWorldBuffersData[m_currentFrame]->GetWorldBufferAlignedSize());
+            // Bind per scene pipeline descriptor set, which includes the ViewProj uniform buffer.
+            commandBuffer->BindPipelineDescriptorSet(m_perSceneDescritorSets[m_currentFrame].get());
 
             for (uint32_t objectIndex = 0; 
                     auto* object : m_objects)
             {
-                // Bind per object pipeline descriptor set, which includes the ViewProj uniform buffer and
-                // World dynamic uniform buffer. Both buffers are updated at the Render function every frame.
-                commandBuffer->BindPipelineDescriptorSet(
-                    m_perObjectDescritorSets[m_currentFrame].get(),
-                    { objectIndex * worldBufferAlignedSize });
+                // Push per object World data to the pipeline.
+                const WorldBuffer worldBuffer = {
+                    .m_worldMatrix = object->GetTransform().ToMatrix(),
+                    .m_inverseTransposeWorldMatrix = object->GetTransform().ToMatrix().Inverse().Transpose()
+                };
+                commandBuffer->PushConstantsToPipeline(
+                    m_pipeline.get(), Vulkan::ShaderType_Vertex, &worldBuffer, sizeof(worldBuffer));
 
                 // Bind Vertex and Index Buffers
                 commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });
@@ -512,19 +421,9 @@ namespace DX
         viewProjBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
         viewProjBufferDesc.m_initialData = nullptr; // ViewProj data will be set every frame to this buffer
 
-        // World Uniform Buffers for max number of objects
-        Vulkan::BufferDesc worldBufferDesc = {};
-        worldBufferDesc.m_elementSizeInBytes = static_cast<uint32_t>(AlignedWorldBuffers::SizeAlignedForDynamicUniformBuffer(m_device.get()));
-        worldBufferDesc.m_elementCount = Vulkan::MaxObjects;
-        worldBufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
-        worldBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
-        worldBufferDesc.m_initialData = nullptr; // World data will be set every frame to this buffer
-
         m_commandBuffers.resize(Vulkan::MaxFrameDraws);
         m_viewProjUniformBuffers.resize(Vulkan::MaxFrameDraws);
-        m_worldUniformBuffers.resize(Vulkan::MaxFrameDraws);
-        m_alignedWorldBuffersData.resize(Vulkan::MaxFrameDraws);
-        m_perObjectDescritorSets.resize(Vulkan::MaxFrameDraws);
+        m_perSceneDescritorSets.resize(Vulkan::MaxFrameDraws);
 
         for (int i = 0; i < Vulkan::MaxFrameDraws; ++i)
         {
@@ -542,29 +441,15 @@ namespace DX
                 return false;
             }
 
-            m_worldUniformBuffers[i] = std::make_unique<Vulkan::Buffer>(m_device.get(), worldBufferDesc);
-            if (!m_worldUniformBuffers[i]->Initialize())
-            {
-                DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
-                return false;
-            }
-
-            // Allocate enough memory for max number of objects
-            m_alignedWorldBuffersData[i] = std::make_unique<AlignedWorldBuffers>(m_device.get(), Vulkan::MaxObjects);
-
-            m_perObjectDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet(0);
-            if (!m_perObjectDescritorSets[i]->Initialize())
+            m_perSceneDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet(0);
+            if (!m_perSceneDescritorSets[i]->Initialize())
             {
                 return false;
             }
 
             // Fill the Pipeline Descriptor Sets with the Uniform Buffers
-
             // ViewProj uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
-            m_perObjectDescritorSets[i]->SetUniformBuffer(0, m_viewProjUniformBuffers[i].get());
-
-            // World uniform buffer is in layout binding 1, which internally points to shader resource binding 1.
-            m_perObjectDescritorSets[i]->SetUniformBufferDynamic(1, m_worldUniformBuffers[i].get());
+            m_perSceneDescritorSets[i]->SetUniformBuffer(0, m_viewProjUniformBuffers[i].get());
         }
 
         return true;

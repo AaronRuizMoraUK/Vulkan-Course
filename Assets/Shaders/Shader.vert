@@ -7,14 +7,14 @@ layout(location = 1) in vec4 vertexInColor;
 // Vertex Outputs
 layout(location = 0) out vec4 vertexOutColor;
 
-layout(set = 0, binding = 0) uniform ViewProjUniformBuffer
+layout(set = 0, binding = 0) uniform ViewProjBuffer
 {
     mat4 viewMatrix;
     mat4 projMatrix;
     vec4 camPos;
 } viewProjBuffer;
 
-layout(set = 0, binding = 1) uniform WorldUniformBuffer
+layout(push_constant) uniform WorldBuffer
 {
     mat4 worldMatrix;
     mat4 inverseTransposeWorldMatrix;

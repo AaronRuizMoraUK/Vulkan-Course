@@ -6,6 +6,7 @@
 #include <Log/Log.h>
 #include <Debug/Debug.h>
 #include <File/FileUtils.h>
+#include <Math/Matrix4x4.h>
 
 #include <vulkan/vulkan.h>
 
@@ -83,12 +84,6 @@ namespace Vulkan
             return false;
         }
 
-        if (!CreateVkDescriptorSetLayouts())
-        {
-            Terminate();
-            return false;
-        }
-
         if (!CreateVkPipelineLayout())
         {
             Terminate();
@@ -134,15 +129,29 @@ namespace Vulkan
         return m_vkPipeline;
     }
 
-    std::shared_ptr<PipelineDescriptorSet> Pipeline::CreatePipelineDescriptorSet(uint32_t setLayoutIndex) const
+    VkPipelineLayout Pipeline::GetVkPipelineLayout()
     {
-        if (setLayoutIndex <= m_descriptorSetLayouts.size())
+        return m_vkPipelineLayout;
+    }
+
+    DescriptorSetLayout* Pipeline::GetPipelineDescriptorSetLayout(uint32_t setLayoutIndex)
+    {
+        if (setLayoutIndex < m_descriptorSetLayouts.size())
+        {
+            return m_descriptorSetLayouts[setLayoutIndex].get();
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    std::shared_ptr<PipelineDescriptorSet> Pipeline::CreatePipelineDescriptorSet(uint32_t setLayoutIndex)
+    {
+        if (setLayoutIndex < m_descriptorSetLayouts.size())
         {
             return std::make_shared<PipelineDescriptorSet>(
-                m_device, m_device->GetVkDescriptorPool(), 
-                m_descriptorSetLayouts[setLayoutIndex].get(),
-                m_vkPipelineLayout,
-                setLayoutIndex);
+                m_device, m_device->GetVkDescriptorPool(), this, setLayoutIndex);
         }
         else
         {
@@ -292,80 +301,81 @@ namespace Vulkan
         return true;
     }
 
-    bool Pipeline::CreateVkDescriptorSetLayouts()
+    bool Pipeline::CreateVkPipelineLayout()
     {
+        // Descriptor Sets Layout
         // TODO: Obtain this from the shaders.
+        {
+            const std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
+                // ViewProj Binding Info
+                {
+                    .binding = 0,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                    .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
+                    .pImmutableSamplers = nullptr
+                }
+            };
 
-        const std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
-            // ViewProj Binding Info
+            auto descriptorSetLayout = std::make_unique<DescriptorSetLayout>();
+
+            descriptorSetLayout->m_numDynamicDescriptors = Utils::GetDynamicDescritorCount(descriptorSetLayoutBindings);
+
+            // Create Descriptor Set Layout with given bindings
+            VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
+            vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+            vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
+            vkDescriptorSetLayoutCreateInfo.flags = 0;
+            vkDescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
+            vkDescriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
+
+            if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(),
+                &vkDescriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout->m_vkDescriptorSetLayout) != VK_SUCCESS)
             {
-                .binding = 0,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
-                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
-                .pImmutableSamplers = nullptr
-            },
+                DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
+                return false;
+            }
+
+            m_descriptorSetLayouts.clear();
+            m_descriptorSetLayouts.push_back(std::move(descriptorSetLayout));
+        }
+
+        // Push Constant Ranges
+        // TODO: Obtain this from the shaders.
+        const std::vector<VkPushConstantRange> vkPushConstantRanges = {
             // World Binding Info
             {
-                .binding = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
-                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT, // Shader stage to bind to
-                .pImmutableSamplers = nullptr
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                .offset = 0,
+                .size = 2 * sizeof(Math::Matrix4x4Packed) // Max size 128 bytes. It fits 2 matrices.
             }
         };
 
-        auto descriptorSetLayout = std::make_unique<DescriptorSetLayout>();
-
-        descriptorSetLayout->m_numDynamicDescriptors = Utils::GetDynamicDescritorCount(descriptorSetLayoutBindings);
-
-        // Create Descriptor Set Layout with given bindings
-        VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
-        vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
-        vkDescriptorSetLayoutCreateInfo.flags = 0;
-        vkDescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
-        vkDescriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
-
-        if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(),
-            &vkDescriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout->m_vkDescriptorSetLayout) != VK_SUCCESS)
+        // Pipeline Layout
         {
-            DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
-            return false;
-        }
+            std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts(m_descriptorSetLayouts.size(), nullptr);
+            std::transform(m_descriptorSetLayouts.begin(), m_descriptorSetLayouts.end(), vkDescriptorSetLayouts.begin(),
+                [](std::unique_ptr<DescriptorSetLayout>& descriptorSetLayout)
+                {
+                    return descriptorSetLayout->m_vkDescriptorSetLayout;
+                });
 
-        m_descriptorSetLayouts.clear();
-        m_descriptorSetLayouts.push_back(std::move(descriptorSetLayout));
+            // Create Pipeline Layout (Resources Layout)
+            // Where to specify Descriptor Set Layouts and Push Constant Ranges.
+            VkPipelineLayoutCreateInfo vkPipelineLayoutCreateInfo = {};
+            vkPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            vkPipelineLayoutCreateInfo.pNext = nullptr;
+            vkPipelineLayoutCreateInfo.flags = 0;
+            vkPipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(vkDescriptorSetLayouts.size());
+            vkPipelineLayoutCreateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
+            vkPipelineLayoutCreateInfo.pushConstantRangeCount = static_cast<uint32_t>(vkPushConstantRanges.size());
+            vkPipelineLayoutCreateInfo.pPushConstantRanges = vkPushConstantRanges.data();
 
-        return true;
-    }
-
-    bool Pipeline::CreateVkPipelineLayout()
-    {
-        // TODO: Obtain this from the shaders.
-
-        std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts(m_descriptorSetLayouts.size(), nullptr);
-        std::transform(m_descriptorSetLayouts.begin(), m_descriptorSetLayouts.end(), vkDescriptorSetLayouts.begin(),
-            [](std::unique_ptr<DescriptorSetLayout>& descriptorSetLayout)
+            if (vkCreatePipelineLayout(m_device->GetVkDevice(), &vkPipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout) != VK_SUCCESS)
             {
-                return descriptorSetLayout->m_vkDescriptorSetLayout;
-            });
-
-        // Create Pipeline Layout (Resources Layout)
-        // Where to specify Descriptor Set Layouts and Push Constant Ranges.
-        VkPipelineLayoutCreateInfo vkPipelineLayoutCreateInfo = {};
-        vkPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        vkPipelineLayoutCreateInfo.pNext = nullptr;
-        vkPipelineLayoutCreateInfo.flags = 0;
-        vkPipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(vkDescriptorSetLayouts.size());
-        vkPipelineLayoutCreateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
-        vkPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-        vkPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
-
-        if (vkCreatePipelineLayout(m_device->GetVkDevice(), &vkPipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout) != VK_SUCCESS)
-        {
-            DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Pipeline Layout.");
-            return false;
+                DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Pipeline Layout.");
+                return false;
+            }
         }
 
         return true;

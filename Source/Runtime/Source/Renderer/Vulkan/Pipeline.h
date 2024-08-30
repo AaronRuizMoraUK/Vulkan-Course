@@ -14,6 +14,8 @@ namespace Vulkan
     class Device;
     class PipelineDescriptorSet;
 
+    constexpr int PushConstantsMaxSize = 128; // Bytes
+
     struct DescriptorSetLayout
     {
         VkDescriptorSetLayout m_vkDescriptorSetLayout = nullptr;
@@ -35,6 +37,8 @@ namespace Vulkan
 
         VkRenderPass GetVkRenderPass();
         VkPipeline GetVkPipeline();
+        VkPipelineLayout GetVkPipelineLayout();
+        DescriptorSetLayout* GetPipelineDescriptorSetLayout(uint32_t setLayoutIndex);
 
         // The object returned has the layout necessary from the shaders of this pipeline.
         // It'll have the right number of descriptors, but the descriptors will have to
@@ -43,11 +47,8 @@ namespace Vulkan
         // 
         // Since resources are bound at descriptor set level, it'd be more optimal to group resources
         // that are updated with the same frequency. For example, use one descriptor set for per scene
-        // resources, other for per material resources and other for per object resources.
-        //
-        // TODO: This is only a part of the pipeline layout. Ideally this should be CreatePipelineLayoutObject,
-        //       which will know how to set resources into the several descriptor sets or push constants it has inside.
-        std::shared_ptr<PipelineDescriptorSet> CreatePipelineDescriptorSet(uint32_t setLayoutIndex) const;
+        // resources, other for per material resources and so on.
+        std::shared_ptr<PipelineDescriptorSet> CreatePipelineDescriptorSet(uint32_t setLayoutIndex);
 
     private:
         Device* m_device = nullptr;
@@ -56,7 +57,6 @@ namespace Vulkan
 
     private:
         bool CreateVkRenderPass();
-        bool CreateVkDescriptorSetLayouts();
         bool CreateVkPipelineLayout();
         bool CreateVkPipeline();
 

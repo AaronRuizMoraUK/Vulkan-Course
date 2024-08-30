@@ -14,15 +14,14 @@ namespace Vulkan
     PipelineDescriptorSet::PipelineDescriptorSet(
         Device* device, 
         VkDescriptorPool vkDescriptorPool, 
-        const DescriptorSetLayout* descriptorSetLayout,
-        const VkPipelineLayout vkPipelineLayout,
+        Pipeline* pipeline,
         uint32_t setLayoutIndex)
         : m_device(device)
         , m_vkDescriptorPool(vkDescriptorPool)
-        , m_descriptorSetLayout(descriptorSetLayout)
-        , m_vkPipelineLayout(vkPipelineLayout)
+        , m_pipeline(pipeline)
         , m_setLayoutIndex(setLayoutIndex)
     {
+        m_descriptorSetLayout = m_pipeline->GetPipelineDescriptorSetLayout(m_setLayoutIndex);
     }
 
     PipelineDescriptorSet::~PipelineDescriptorSet()
@@ -56,9 +55,14 @@ namespace Vulkan
         m_vkDescriptorSet = nullptr;
     }
 
-    VkDescriptorSet PipelineDescriptorSet::GetVkDescriptorSet()
+    Pipeline* PipelineDescriptorSet::GetPipeline()
     {
-        return m_vkDescriptorSet;
+        return m_pipeline;
+    }
+
+    uint32_t PipelineDescriptorSet::GetSetLayoutIndex() const
+    {
+        return m_setLayoutIndex;
     }
 
     const DescriptorSetLayout* PipelineDescriptorSet::GetDescriptorSetLayout() const
@@ -66,14 +70,9 @@ namespace Vulkan
         return m_descriptorSetLayout;
     }
 
-    const VkPipelineLayout PipelineDescriptorSet::GetVkPipelineLayout() const
+    VkDescriptorSet PipelineDescriptorSet::GetVkDescriptorSet()
     {
-        return m_vkPipelineLayout;
-    }
-
-    uint32_t PipelineDescriptorSet::GetSetLayoutIndex() const
-    {
-        return m_setLayoutIndex;
+        return m_vkDescriptorSet;
     }
 
     void PipelineDescriptorSet::SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer)

@@ -148,7 +148,7 @@ namespace Vulkan
 
         vkCmdBindDescriptorSets(m_vkCommandBuffer, 
             VK_PIPELINE_BIND_POINT_GRAPHICS, 
-            descriptorSet->GetVkPipelineLayout(),
+            descriptorSet->GetPipeline()->GetVkPipelineLayout(),
             descriptorSet->GetSetLayoutIndex(), // Index of the descriptor set inside the pipeline layout
             static_cast<uint32_t>(vkDescriptorSets.size()),
             vkDescriptorSets.data(),
@@ -174,12 +174,32 @@ namespace Vulkan
 
         vkCmdBindDescriptorSets(m_vkCommandBuffer,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
-            descriptorSet->GetVkPipelineLayout(),
+            descriptorSet->GetPipeline()->GetVkPipelineLayout(),
             descriptorSet->GetSetLayoutIndex(), // Index of the descriptor set inside the pipeline layout
             static_cast<uint32_t>(vkDescriptorSets.size()),
             vkDescriptorSets.data(),
             static_cast<uint32_t>(dynamicOffsetsInBytes.size()), // Dynamic offset count
             dynamicOffsetsInBytes.data());
+    }
+
+    void CommandBuffer::PushConstantsToPipeline(
+        Pipeline* pipeline, ShaderType shaderType, const void* data, uint32_t dataSize, uint32_t offset)
+    {
+        // Max size is 128 bytes
+        if (dataSize > PushConstantsMaxSize)
+        {
+            DX_LOG(Error, "CommandBuffer",
+                "Pushing %d bytes of data into the pipeline, which is greater than the max size allowed of %d bytes.",
+                dataSize, PushConstantsMaxSize);
+            return;
+        }
+
+        vkCmdPushConstants(m_vkCommandBuffer, 
+            pipeline->GetVkPipelineLayout(), 
+            ToVkShaderStageFlags(shaderType),
+            offset,
+            dataSize,
+            data);
     }
 
     void CommandBuffer::BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers)
