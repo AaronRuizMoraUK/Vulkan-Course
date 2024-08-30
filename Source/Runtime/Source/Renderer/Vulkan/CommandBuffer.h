@@ -38,6 +38,7 @@ namespace Vulkan
         // -----------------------------------------------------------------------------
         // These functions can be called asynchronously from a thread to record commands.
         // -----------------------------------------------------------------------------
+        void Reset(); // Call this to reset command buffer outside Begin/End scope.
         bool Begin(CommandBufferUsageFlags flags = 0); // Call this first before the command calls.
         void End();   // Call this last after all the command calls.
 

@@ -261,6 +261,7 @@ namespace DX
     {
         Vulkan::CommandBuffer* commandBuffer = m_commandBuffers[m_currentFrame].get();
 
+        commandBuffer->Reset();
         if (commandBuffer->Begin())
         {
             commandBuffer->BeginRenderPass(frameBuffer,
@@ -271,8 +272,8 @@ namespace DX
             // Bind per scene pipeline descriptor set, which includes the ViewProj uniform buffer.
             commandBuffer->BindPipelineDescriptorSet(m_perSceneDescritorSets[m_currentFrame].get());
 
-            for (uint32_t objectIndex = 0; 
-                    auto* object : m_objects)
+            for (uint32_t objectIndex = 0;
+                auto* object : m_objects)
             {
                 // Push per object World data to the pipeline.
                 const WorldBuffer worldBuffer = {

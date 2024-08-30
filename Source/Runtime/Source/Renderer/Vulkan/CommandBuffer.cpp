@@ -56,6 +56,11 @@ namespace Vulkan
         return m_vkCommandBuffer;
     }
 
+    void CommandBuffer::Reset()
+    {
+        vkResetCommandBuffer(m_vkCommandBuffer, 0/*VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT*/);
+    }
+
     bool CommandBuffer::Begin(CommandBufferUsageFlags flags)
     {
         VkCommandBufferBeginInfo bufferBeginInfo = {};
@@ -183,7 +188,11 @@ namespace Vulkan
     }
 
     void CommandBuffer::PushConstantsToPipeline(
-        Pipeline* pipeline, ShaderType shaderType, const void* data, uint32_t dataSize, uint32_t offset)
+        [[maybe_unused]] Pipeline* pipeline, 
+        [[maybe_unused]] ShaderType shaderType, 
+        [[maybe_unused]] const void* data, 
+        [[maybe_unused]] uint32_t dataSize, 
+        [[maybe_unused]] uint32_t offset)
     {
         // Max size is 128 bytes
         if (dataSize > PushConstantsMaxSize)

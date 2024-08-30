@@ -412,7 +412,7 @@ namespace Vulkan
             VkCommandPoolCreateInfo vkCommandPoolCreateInfo = {};
             vkCommandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
             vkCommandPoolCreateInfo.pNext = nullptr;
-            vkCommandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Command buffers will reset when CommandBuffer::Begin is called
+            vkCommandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Allows to reset command buffers
             vkCommandPoolCreateInfo.queueFamilyIndex = m_queueFamilyInfo.m_familyTypeToFamilyIndices[familyType];
 
             if (vkCreateCommandPool(m_vkDevice, &vkCommandPoolCreateInfo, nullptr, &m_vkCommandPools[familyType]) != VK_SUCCESS)
