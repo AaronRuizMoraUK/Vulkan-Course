@@ -77,11 +77,6 @@ namespace DX
 
         std::ranges::for_each(m_objects, [this](auto& object) { m_renderer->AddObject(object.get()); });
 
-        // Pre-record the commands in all command buffers of the swap chain
-        // TODO: to be removed and generate instead the commands for the command buffer
-        //       of the current frame buffer being rendered to.
-        m_renderer->RecordCommands();
-
         return true;
     }
 

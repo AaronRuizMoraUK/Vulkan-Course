@@ -266,6 +266,9 @@ namespace DX
                 m_alignedWorldBuffersData[swapChainImageIndex]->GetWorldBufferAlignedSize() * m_objects.size());
         }
 
+        // Record the commands for the current frame
+        RecordCommands(swapChainImageIndex);
+
         // 2) Submit the command buffer (of the current image) to the queue for execution.
         //    Wait at the convenient stage within the pipeline for the image semaphore to be signaled (so it's available for drawing to it).
         //    For example, allow to execute vertex shader, but wait for the image semaphore to be available before executing fragment shader.
@@ -342,46 +345,42 @@ namespace DX
         m_objects.erase(object);
     }
 
-    void Renderer::RecordCommands()
+    void Renderer::RecordCommands(uint32_t swapChainImageIndex)
     {
-        const uint32_t imageCount = m_swapChain->GetImageCount();
-        for (uint32_t imageIndex = 0; imageIndex < imageCount; ++imageIndex)
+        Vulkan::CommandBuffer* commandBuffer = m_swapChain->GetCommandBuffer(swapChainImageIndex);
+
+        if (commandBuffer->Begin())
         {
-            Vulkan::CommandBuffer* commandBuffer = m_swapChain->GetCommandBuffer(imageIndex);
+            commandBuffer->BeginRenderPass(
+                m_swapChain->GetFrameBuffer(swapChainImageIndex),
+                Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f));
 
-            if (commandBuffer->Begin())
+            commandBuffer->BindPipeline(m_pipeline.get());
+
+            const uint32_t worldBufferAlignedSize = 
+                static_cast<uint32_t>(m_alignedWorldBuffersData[swapChainImageIndex]->GetWorldBufferAlignedSize());
+
+            for (uint32_t objectIndex = 0; 
+                    auto* object : m_objects)
             {
-                commandBuffer->BeginRenderPass(
-                    m_swapChain->GetFrameBuffer(imageIndex), 
-                    Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f));
+                // Bind per object pipeline descriptor set, which includes the ViewProj uniform buffer and
+                // World dynamic uniform buffer. Both buffers are updated at the Render function every frame.
+                commandBuffer->BindPipelineDescriptorSet(
+                    m_perObjectDescritorSets[swapChainImageIndex].get(),
+                    { objectIndex * worldBufferAlignedSize });
 
-                commandBuffer->BindPipeline(m_pipeline.get());
+                // Bind Vertex and Index Buffers
+                commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });
+                commandBuffer->BindIndexBuffer(object->GetIndexBuffer().get());
 
-                const uint32_t worldBufferAlignedSize = 
-                    static_cast<uint32_t>(m_alignedWorldBuffersData[imageIndex]->GetWorldBufferAlignedSize());
+                // Draw
+                commandBuffer->DrawIndexed(object->GetIndexCount());
 
-                for (uint32_t objectIndex = 0; 
-                     auto* object : m_objects)
-                {
-                    // Bind per object pipeline descriptor set, which includes the ViewProj uniform buffer and
-                    // World dynamic uniform buffer. Both buffers are updated at the Render function every frame.
-                    commandBuffer->BindPipelineDescriptorSet(
-                        m_perObjectDescritorSets[imageIndex].get(), 
-                        { objectIndex * worldBufferAlignedSize });
-
-                    // Bind Vertex and Index Buffers
-                    commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });
-                    commandBuffer->BindIndexBuffer(object->GetIndexBuffer().get());
-
-                    // Draw
-                    commandBuffer->DrawIndexed(object->GetIndexCount());
-
-                    ++objectIndex;
-                }
-
-                commandBuffer->EndRenderPass();
-                commandBuffer->End();
+                ++objectIndex;
             }
+
+            commandBuffer->EndRenderPass();
+            commandBuffer->End();
         }
     }
 

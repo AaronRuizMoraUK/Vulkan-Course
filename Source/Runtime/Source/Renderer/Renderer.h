@@ -57,10 +57,6 @@ namespace DX
         void AddObject(Object* object);
         void RemoveObject(Object* object);
 
-        // TODO: Remove this function and inside Render() record the
-        //       commands every frame the current frame command buffer.
-        void RecordCommands();
-
     private:
         RendererId m_rendererId;
         Window* m_window = nullptr;
@@ -128,6 +124,8 @@ namespace DX
             size_t m_worldBufferAlignedSize = 0;
             uint8_t* m_data = nullptr;
         };
+
+        void RecordCommands(uint32_t swapChainImageIndex);
 
     private:
         bool CreateInstance();
