@@ -20,6 +20,8 @@ namespace Vulkan
     class Pipeline;
     class Buffer;
     class PipelineDescriptorSet;
+    class CommandBuffer;
+    class FrameBuffer;
 }
 
 namespace DX
@@ -58,6 +60,9 @@ namespace DX
         void RemoveObject(Object* object);
 
     private:
+        void UpdateFrameData();
+        void RecordCommands(Vulkan::FrameBuffer* frameBuffer);
+
         RendererId m_rendererId;
         Window* m_window = nullptr;
 
@@ -125,8 +130,6 @@ namespace DX
             uint8_t* m_data = nullptr;
         };
 
-        void RecordCommands(uint32_t swapChainImageIndex);
-
     private:
         bool CreateInstance();
         bool CreateDevice();
@@ -165,18 +168,16 @@ namespace DX
         // ---------------------------
         // Per Frame data
         // 
-        // NOTE: Since we are pre-recording all the commands and not every frame,
-        //       we need as many elements as frame buffers (that's as many elements
-        //       as swap chain images). Once the commands are generated every frame
-        //       then it should be enough with having MaxFrameDraws elements instead.
-        // 
         // TODO: Move out of renderer to a new class.
         bool CreateFrameData();
 
+        // Command buffers for sending commands to each swap chain frame buffer.
+        std::vector<std::unique_ptr<Vulkan::CommandBuffer>> m_commandBuffers;
+
         // We need uniform buffers for each frame so they won't stumble into each other
         // while drawing the independent frames. They might have different content per frame.
-        std::vector<std::shared_ptr<Vulkan::Buffer>> m_viewProjUniformBuffers;
-        std::vector<std::shared_ptr<Vulkan::Buffer>> m_worldUniformBuffers;
+        std::vector<std::unique_ptr<Vulkan::Buffer>> m_viewProjUniformBuffers;
+        std::vector<std::unique_ptr<Vulkan::Buffer>> m_worldUniformBuffers;
         std::vector<std::unique_ptr<AlignedWorldBuffers>> m_alignedWorldBuffersData;
         // We need pipeline descriptor sets for each frame so they won't stumble into each other
         // while drawing the independent frames. They might have different content per frame.

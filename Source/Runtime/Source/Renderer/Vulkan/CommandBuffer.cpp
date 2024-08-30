@@ -89,8 +89,6 @@ namespace Vulkan
         std::optional<float> clearDepth,
         std::optional<uint8_t> clearStencil)
     {
-        const auto& imageSize = frameBuffer->GetColorImage().m_size;
-
         // Clear values needs to match 1:1 with attachments in frame buffer
         std::vector<VkClearValue> clearValues;
         if (clearColor.has_value())
@@ -111,6 +109,8 @@ namespace Vulkan
             };
             clearValues.push_back(depthStencilClearValue);
         }
+
+        const auto& imageSize = frameBuffer->GetColorImage().m_size;
 
         // Information about how to begin a render pass (only needed for graphics operations)
         VkRenderPassBeginInfo vkRenderPassBeginInfo = {};

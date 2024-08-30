@@ -166,6 +166,7 @@ namespace DX
         m_alignedWorldBuffersData.clear();
         m_worldUniformBuffers.clear();
         m_viewProjUniformBuffers.clear();
+        m_commandBuffers.clear();
 
         if (m_device)
         {
@@ -239,35 +240,9 @@ namespace DX
             return;
         }
 
-        // Update ViewProj uniform buffer
-        {
-            const ViewProjBuffer viewProjBuffer(
-                m_camera->GetViewMatrix(),
-                m_camera->GetProjectionMatrix(),
-                Math::Vector4{m_camera->GetTransform().m_position, 1.0f}
-            );
-            m_viewProjUniformBuffers[swapChainImageIndex]->UpdateBufferData(&viewProjBuffer, sizeof(viewProjBuffer));
-        }
-
-        // Update world uniform buffer dynamic with all objects' matrices
-        {
-            for (uint32_t objectIndex = 0;
-                auto * object : m_objects)
-            {
-                WorldBuffer* worldBuffer = m_alignedWorldBuffersData[swapChainImageIndex]->GetWorldBuffer(objectIndex);
-                worldBuffer->m_worldMatrix = object->GetTransform().ToMatrix();
-                worldBuffer->m_inverseTransposeWorldMatrix = object->GetTransform().ToMatrix().Inverse().Transpose();
-
-                ++objectIndex;
-            }
-
-            m_worldUniformBuffers[swapChainImageIndex]->UpdateBufferData(
-                m_alignedWorldBuffersData[swapChainImageIndex]->GetData(), 
-                m_alignedWorldBuffersData[swapChainImageIndex]->GetWorldBufferAlignedSize() * m_objects.size());
-        }
-
-        // Record the commands for the current frame
-        RecordCommands(swapChainImageIndex);
+        // Update data and record the commands for the current frame
+        UpdateFrameData();
+        RecordCommands(m_swapChain->GetFrameBuffer(swapChainImageIndex));
 
         // 2) Submit the command buffer (of the current image) to the queue for execution.
         //    Wait at the convenient stage within the pipeline for the image semaphore to be signaled (so it's available for drawing to it).
@@ -276,7 +251,7 @@ namespace DX
         const std::vector<VkPipelineStageFlags> waitStages = {
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
         };
-        VkCommandBuffer currentCommandBuffer = m_swapChain->GetCommandBuffer(swapChainImageIndex)->GetVkCommandBuffer();
+        VkCommandBuffer currentCommandBuffer = m_commandBuffers[m_currentFrame]->GetVkCommandBuffer();
 
         VkSubmitInfo vkSubmitInfo = {};
         vkSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -345,20 +320,49 @@ namespace DX
         m_objects.erase(object);
     }
 
-    void Renderer::RecordCommands(uint32_t swapChainImageIndex)
+    void Renderer::UpdateFrameData()
     {
-        Vulkan::CommandBuffer* commandBuffer = m_swapChain->GetCommandBuffer(swapChainImageIndex);
+        // Update ViewProj uniform buffer
+        {
+            const ViewProjBuffer viewProjBuffer(
+                m_camera->GetViewMatrix(),
+                m_camera->GetProjectionMatrix(),
+                Math::Vector4{ m_camera->GetTransform().m_position, 1.0f }
+            );
+            m_viewProjUniformBuffers[m_currentFrame]->UpdateBufferData(&viewProjBuffer, sizeof(viewProjBuffer));
+        }
+
+        // Update world uniform buffer dynamic with all objects' matrices
+        {
+            for (uint32_t objectIndex = 0;
+                auto * object : m_objects)
+            {
+                WorldBuffer* worldBuffer = m_alignedWorldBuffersData[m_currentFrame]->GetWorldBuffer(objectIndex);
+                worldBuffer->m_worldMatrix = object->GetTransform().ToMatrix();
+                worldBuffer->m_inverseTransposeWorldMatrix = object->GetTransform().ToMatrix().Inverse().Transpose();
+
+                ++objectIndex;
+            }
+
+            m_worldUniformBuffers[m_currentFrame]->UpdateBufferData(
+                m_alignedWorldBuffersData[m_currentFrame]->GetData(),
+                m_alignedWorldBuffersData[m_currentFrame]->GetWorldBufferAlignedSize() * m_objects.size());
+        }
+    }
+
+    void Renderer::RecordCommands(Vulkan::FrameBuffer* frameBuffer)
+    {
+        Vulkan::CommandBuffer* commandBuffer = m_commandBuffers[m_currentFrame].get();
 
         if (commandBuffer->Begin())
         {
-            commandBuffer->BeginRenderPass(
-                m_swapChain->GetFrameBuffer(swapChainImageIndex),
+            commandBuffer->BeginRenderPass(frameBuffer,
                 Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f));
 
             commandBuffer->BindPipeline(m_pipeline.get());
 
             const uint32_t worldBufferAlignedSize = 
-                static_cast<uint32_t>(m_alignedWorldBuffersData[swapChainImageIndex]->GetWorldBufferAlignedSize());
+                static_cast<uint32_t>(m_alignedWorldBuffersData[m_currentFrame]->GetWorldBufferAlignedSize());
 
             for (uint32_t objectIndex = 0; 
                     auto* object : m_objects)
@@ -366,7 +370,7 @@ namespace DX
                 // Bind per object pipeline descriptor set, which includes the ViewProj uniform buffer and
                 // World dynamic uniform buffer. Both buffers are updated at the Render function every frame.
                 commandBuffer->BindPipelineDescriptorSet(
-                    m_perObjectDescritorSets[swapChainImageIndex].get(),
+                    m_perObjectDescritorSets[m_currentFrame].get(),
                     { objectIndex * worldBufferAlignedSize });
 
                 // Bind Vertex and Index Buffers
@@ -500,65 +504,67 @@ namespace DX
 
     bool Renderer::CreateFrameData()
     {
-        const int imageCount = m_swapChain->GetImageCount();
+        // ViewProj Uniform Buffers
+        Vulkan::BufferDesc viewProjBufferDesc = {};
+        viewProjBufferDesc.m_elementSizeInBytes = sizeof(ViewProjBuffer);
+        viewProjBufferDesc.m_elementCount = 1;
+        viewProjBufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
+        viewProjBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
+        viewProjBufferDesc.m_initialData = nullptr; // ViewProj data will be set every frame to this buffer
 
-        // Per Object Pipeline Descriptor Set
+        // World Uniform Buffers for max number of objects
+        Vulkan::BufferDesc worldBufferDesc = {};
+        worldBufferDesc.m_elementSizeInBytes = static_cast<uint32_t>(AlignedWorldBuffers::SizeAlignedForDynamicUniformBuffer(m_device.get()));
+        worldBufferDesc.m_elementCount = Vulkan::MaxObjects;
+        worldBufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
+        worldBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
+        worldBufferDesc.m_initialData = nullptr; // World data will be set every frame to this buffer
+
+        m_commandBuffers.resize(Vulkan::MaxFrameDraws);
+        m_viewProjUniformBuffers.resize(Vulkan::MaxFrameDraws);
+        m_worldUniformBuffers.resize(Vulkan::MaxFrameDraws);
+        m_alignedWorldBuffersData.resize(Vulkan::MaxFrameDraws);
+        m_perObjectDescritorSets.resize(Vulkan::MaxFrameDraws);
+
+        for (int i = 0; i < Vulkan::MaxFrameDraws; ++i)
         {
-            // ViewProj Uniform Buffers
-            Vulkan::BufferDesc viewProjBufferDesc = {};
-            viewProjBufferDesc.m_elementSizeInBytes = sizeof(ViewProjBuffer);
-            viewProjBufferDesc.m_elementCount = 1;
-            viewProjBufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
-            viewProjBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
-            viewProjBufferDesc.m_initialData = nullptr; // ViewProj data will be set every frame to this buffer
-
-            // World Uniform Buffers for max number of objects
-            Vulkan::BufferDesc worldBufferDesc = {};
-            worldBufferDesc.m_elementSizeInBytes = static_cast<uint32_t>(AlignedWorldBuffers::SizeAlignedForDynamicUniformBuffer(m_device.get()));
-            worldBufferDesc.m_elementCount = Vulkan::MaxObjects;
-            worldBufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
-            worldBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
-            worldBufferDesc.m_initialData = nullptr; // World data will be set every frame to this buffer
-
-            m_viewProjUniformBuffers.resize(imageCount);
-            m_worldUniformBuffers.resize(imageCount);
-            m_alignedWorldBuffersData.resize(imageCount);
-            m_perObjectDescritorSets.resize(imageCount);
-
-            for (int i = 0; i < imageCount; ++i)
+            m_commandBuffers[i] = std::make_unique<Vulkan::CommandBuffer>(m_device.get(), m_device->GetVkCommandPool(Vulkan::QueueFamilyType_Graphics));
+            if (!m_commandBuffers[i]->Initialize())
             {
-                m_viewProjUniformBuffers[i] = std::make_shared<Vulkan::Buffer>(m_device.get(), viewProjBufferDesc);
-                if (!m_viewProjUniformBuffers[i]->Initialize())
-                {
-                    DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
-                    return false;
-                }
-
-                m_worldUniformBuffers[i] = std::make_shared<Vulkan::Buffer>(m_device.get(), worldBufferDesc);
-                if (!m_worldUniformBuffers[i]->Initialize())
-                {
-                    DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
-                    return false;
-                }
-
-                // Allocate enough memory for max number of objects
-                m_alignedWorldBuffersData[i] = std::make_unique<AlignedWorldBuffers>(m_device.get(), Vulkan::MaxObjects);
-
-                // Create Pipeline Descriptor Set
-                m_perObjectDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet(0);
-                if (!m_perObjectDescritorSets[i]->Initialize())
-                {
-                    return false;
-                }
-
-                // Fill the Pipeline Descriptor Sets with the Uniform Buffers
-
-                // ViewProj uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
-                m_perObjectDescritorSets[i]->SetUniformBuffer(0, m_viewProjUniformBuffers[i].get());
-
-                // World uniform buffer is in layout binding 1, which internally points to shader resource binding 1.
-                m_perObjectDescritorSets[i]->SetUniformBufferDynamic(1, m_worldUniformBuffers[i].get());
+                DX_LOG(Error, "Renderer", "Failed to create CommandBuffer.");
+                return false;
             }
+
+            m_viewProjUniformBuffers[i] = std::make_unique<Vulkan::Buffer>(m_device.get(), viewProjBufferDesc);
+            if (!m_viewProjUniformBuffers[i]->Initialize())
+            {
+                DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
+                return false;
+            }
+
+            m_worldUniformBuffers[i] = std::make_unique<Vulkan::Buffer>(m_device.get(), worldBufferDesc);
+            if (!m_worldUniformBuffers[i]->Initialize())
+            {
+                DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
+                return false;
+            }
+
+            // Allocate enough memory for max number of objects
+            m_alignedWorldBuffersData[i] = std::make_unique<AlignedWorldBuffers>(m_device.get(), Vulkan::MaxObjects);
+
+            m_perObjectDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet(0);
+            if (!m_perObjectDescritorSets[i]->Initialize())
+            {
+                return false;
+            }
+
+            // Fill the Pipeline Descriptor Sets with the Uniform Buffers
+
+            // ViewProj uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
+            m_perObjectDescritorSets[i]->SetUniformBuffer(0, m_viewProjUniformBuffers[i].get());
+
+            // World uniform buffer is in layout binding 1, which internally points to shader resource binding 1.
+            m_perObjectDescritorSets[i]->SetUniformBufferDynamic(1, m_worldUniformBuffers[i].get());
         }
 
         return true;

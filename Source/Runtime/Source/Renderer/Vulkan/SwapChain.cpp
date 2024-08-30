@@ -3,7 +3,6 @@
 #include <Renderer/Vulkan/Instance.h>
 #include <Renderer/Vulkan/Device.h>
 #include <Renderer/Vulkan/FrameBuffer.h>
-#include <Renderer/Vulkan/CommandBuffer.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -202,12 +201,6 @@ namespace Vulkan
             return false;
         }
 
-        if (!CreateCommandBuffers())
-        {
-            Terminate();
-            return false;
-        }
-
         return true;
     }
 
@@ -216,8 +209,6 @@ namespace Vulkan
         DX_LOG(Info, "Vulkan SwapChain", "Terminating Vulkan SwapChain...");
 
         DestroyFrameBuffers();
-
-        m_commandBuffers.clear();
 
         vkDestroySwapchainKHR(m_device->GetVkDevice(), m_vkSwapChain, nullptr);
         m_vkSwapChain = nullptr;
@@ -242,13 +233,6 @@ namespace Vulkan
     {
         return (imageIndex < m_frameBuffers.size())
             ? m_frameBuffers[imageIndex].get()
-            : nullptr;
-    }
-
-    CommandBuffer* SwapChain::GetCommandBuffer(uint32_t imageIndex)
-    {
-        return (imageIndex < m_commandBuffers.size())
-            ? m_commandBuffers[imageIndex].get()
             : nullptr;
     }
 
@@ -334,25 +318,6 @@ namespace Vulkan
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Color Space: %d", vkSurfaceFormat.colorSpace);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Present Mode: %d", vkPresentMode);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Unique Queue Family Indices: %d", uniqueFamilyIndices.size());
-
-        return true;
-    }
-
-    bool SwapChain::CreateCommandBuffers()
-    {
-        // Create graphics command buffers for all frame buffers of the swap chain.
-        // That's one command buffer for each image of the swap chain.
-        m_commandBuffers.resize(m_imageCount);
-        for (auto& commandBuffer : m_commandBuffers)
-        {
-            commandBuffer = std::make_unique<CommandBuffer>(m_device, m_device->GetVkCommandPool(QueueFamilyType_Graphics));
-
-            if (!commandBuffer->Initialize())
-            {
-                DX_LOG(Error, "Vulkan SwapChain", "Failed to create CommandBuffer.");
-                return false;
-            }
-        }
 
         return true;
     }

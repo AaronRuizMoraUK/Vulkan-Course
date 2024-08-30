@@ -427,11 +427,6 @@ namespace Vulkan
 
     bool Device::CreateVkDescriptorPool()
     {
-        // TODO: Remove and use MaxFrameDraws when the uniform buffers
-        //       are created per max frame draws and not by number of
-        //       images in the swap chain.
-        constexpr int tempMaxFrameDraws = 3;
-
         // Increase max counts as needed
         constexpr int maxDescriptorSetsPerFrame = 1;
         constexpr int maxUniformBufferDescriptorsPerFrame = 1;
@@ -439,17 +434,17 @@ namespace Vulkan
 
         // Max number of descriptor sets in the pool.
         // Descriptor sets contain descriptors. A descriptor can be used in different descriptor sets.
-        constexpr int maxDescriptorSets = tempMaxFrameDraws * maxDescriptorSetsPerFrame;
+        constexpr int maxDescriptorSets = MaxFrameDraws * maxDescriptorSetsPerFrame;
 
         // Max number of descriptors (per type) in the pool.
         const std::vector<VkDescriptorPoolSize> vkDescriptorPoolSizes = {
             {
                 .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .descriptorCount = tempMaxFrameDraws * maxUniformBufferDescriptorsPerFrame
+                .descriptorCount = MaxFrameDraws * maxUniformBufferDescriptorsPerFrame
             },
             {
                 .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
-                .descriptorCount = tempMaxFrameDraws * maxUniformBufferDynamicDescriptorsPerFrame
+                .descriptorCount = MaxFrameDraws * maxUniformBufferDynamicDescriptorsPerFrame
             }
         };
 
