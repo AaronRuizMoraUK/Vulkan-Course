@@ -240,11 +240,11 @@ namespace DX
             return;
         }
 
-        // Update data and record the commands for the current frame
+        // 2) Update data and record the commands for the current frame
         UpdateFrameData();
         RecordCommands(m_swapChain->GetFrameBuffer(swapChainImageIndex));
 
-        // 2) Submit the command buffer (of the current image) to the queue for execution.
+        // 3) Submit the command buffer (of the current image) to the queue for execution.
         //    Wait at the convenient stage within the pipeline for the image semaphore to be signaled (so it's available for drawing to it).
         //    For example, allow to execute vertex shader, but wait for the image semaphore to be available before executing fragment shader.
         //    Lastly signal (with a different semaphore) when it has finished rendering.
@@ -273,7 +273,7 @@ namespace DX
             return;
         }
         
-        // 3) Present image to screen when it has signaled that it has finished rendering.
+        // 4) Present image to screen when it has signaled that it has finished rendering.
         const VkSwapchainKHR vkSwapChain = m_swapChain->GetVkSwapChain();
 
         VkPresentInfoKHR vkPresentInfoKHR = {};
