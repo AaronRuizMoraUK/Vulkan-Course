@@ -2,9 +2,9 @@
 
 <img src="./Vulkan-logo.png">
 
-***- Vulkan Course in progress -***
-
 Project generated while doing the Udemy course *[Learn the Vulkan API with C++](https://www.udemy.com/course/learn-the-vulkan-api-with-cpp/)* by Ben Cook.
+
+This branch contains all the code generated up to *Lecture 21: Dynamic Uniform Buffers* where the world matrices of all objects are passed to the vertex shader using a dynamic uniform buffer.
 
 ## Build and Run
 
