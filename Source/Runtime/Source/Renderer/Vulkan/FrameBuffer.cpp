@@ -225,7 +225,7 @@ namespace Vulkan
         vkFramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         vkFramebufferCreateInfo.pNext = nullptr;
         vkFramebufferCreateInfo.flags = 0;
-        vkFramebufferCreateInfo.renderPass = m_vkRenderPass; // Render pass the FrameBuffer will be used with
+        vkFramebufferCreateInfo.renderPass = m_vkRenderPass; // Render pass this FrameBuffer can be used with
         vkFramebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         vkFramebufferCreateInfo.pAttachments = attachments.data();
         vkFramebufferCreateInfo.width = m_colorImage.m_size.x;

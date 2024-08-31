@@ -50,12 +50,19 @@ namespace Vulkan
 
         // -- Graphics commands --
 
+        // Begin a render pass to an specific frame buffer.
+        // The render pass is obtained from the frame buffer as it stores which render pass is compatible with.
         void BeginRenderPass(FrameBuffer* frameBuffer,
             std::optional<Math::Color> clearColor,
             std::optional<float> clearDepth = std::nullopt,
             std::optional<uint8_t> clearStencil = std::nullopt);
         void EndRenderPass();
 
+        // Sets which pipeline the render pass will use when calling draw. The pipeline needs to compatible
+        // with the render pass. One pipeline will be used with one subpass of the render pass. The pipeline
+        // knows which subpass is. So it needs to be bound as many pipelines as there are subpasses before
+        // calling draw. For example, a render pass with 2 subpasses will need 2 BindPipeline calls where the
+        // first pipeline was created for subpass 0 and the second pipeline was created for subpass 1. 
         void BindPipeline(Pipeline* pipeline);
 
         void BindPipelineDescriptorSet(PipelineDescriptorSet* descriptorSet);
