@@ -259,6 +259,10 @@ namespace DX
 
     void Renderer::RecordCommands(Vulkan::FrameBuffer* frameBuffer)
     {
+        // Calling vkResetCommandPool before reusing its command buffers in this frame.
+        // Otherwise, the pool will keep on growing until you run out of memory.
+        m_device->ResetVkCommandPool(Vulkan::QueueFamilyType_Graphics, m_currentFrame);
+
         // When Vulkan Validation is enabled, resetting the command pool or queues is not enough
         // to free memory. The driver is keeping the memory for debugging and tracking purposes.
         // Recreating (which actually reallocates) the command buffers in this case forces the
@@ -270,10 +274,6 @@ namespace DX
             const bool ok = m_commandBuffers[m_currentFrame]->Initialize();
             DX_ASSERT(ok, "Renderer", "Failed to recreate command buffer");
         }
- 
-        // Calling vkResetCommandPool before reusing its command buffers in this frame.
-        // Otherwise, the pool will keep on growing until you run out of memory.
-        m_device->ResetVkCommandPool(Vulkan::QueueFamilyType_Graphics, m_currentFrame);
 
         Vulkan::CommandBuffer* commandBuffer = m_commandBuffers[m_currentFrame].get();
 

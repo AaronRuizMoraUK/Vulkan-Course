@@ -32,7 +32,7 @@ namespace Vulkan
             return true; // Already initialized
         }
 
-        DX_LOG(Info, "Vulkan CommandBuffer", "Initializing Vulkan CommandBuffer...");
+        //DX_LOG(Info, "Vulkan CommandBuffer", "Initializing Vulkan CommandBuffer...");
 
         if (!AllocateVkCommandBuffer())
         {
@@ -45,7 +45,7 @@ namespace Vulkan
 
     void CommandBuffer::Terminate()
     {
-        DX_LOG(Info, "Vulkan CommandBuffer", "Terminating Vulkan CommandBuffer...");
+        //DX_LOG(Info, "Vulkan CommandBuffer", "Terminating Vulkan CommandBuffer...");
 
         vkFreeCommandBuffers(m_device->GetVkDevice(), m_vkCommandPool, 1, &m_vkCommandBuffer);
         m_vkCommandBuffer = nullptr;
