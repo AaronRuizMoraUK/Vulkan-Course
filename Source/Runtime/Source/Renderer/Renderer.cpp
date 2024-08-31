@@ -265,8 +265,8 @@ namespace DX
 
         // When Vulkan Validation is enabled, resetting the command pool or queues is not enough
         // to free memory. The driver is keeping the memory for debugging and tracking purposes.
-        // Recreating (which actually reallocates) the command buffers in this case forces the
-        // to free the memory and avoid the application continuously growing.
+        // Recreating (which actually reallocates) the command buffers in this case forces to
+        // free the memory and avoid the application's memory to continuously grow every frame.
         if (Vulkan::Validation::DebugEnabled)
         {
             m_commandBuffers[m_currentFrame] = std::make_unique<Vulkan::CommandBuffer>(m_device.get(),
