@@ -38,9 +38,15 @@ namespace Vulkan
         // -----------------------------------------------------------------------------
         // These functions can be called asynchronously from a thread to record commands.
         // -----------------------------------------------------------------------------
-        void Reset(); // Call this to reset command buffer outside Begin/End scope.
         bool Begin(CommandBufferUsageFlags flags = 0); // Call this first before the command calls.
         void End();   // Call this last after all the command calls.
+
+        // Call this to reset command buffer outside Begin/End scope.
+        // Make sure GPU is not using the command buffer before resetting it.
+        // Resetting doesn't necessarily free memory from the pool, just sets 
+        // the command buffer to initial state so it can be reused. The pool used to create
+        // this command buffer needs the flag VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT.
+        void Reset();
 
         // -- Graphics commands --
 

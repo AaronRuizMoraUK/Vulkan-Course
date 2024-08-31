@@ -170,7 +170,6 @@ namespace Vulkan
         : m_instance(instance)
     {
         m_vkQueues.fill(nullptr);
-        m_vkCommandPools.fill(nullptr);
     }
 
     Device::~Device()
@@ -221,11 +220,14 @@ namespace Vulkan
         vkDestroyDescriptorPool(m_vkDevice, m_vkDescriptorPool, nullptr);
         m_vkDescriptorPool = nullptr;
 
-        std::ranges::for_each(m_vkCommandPools, [this](VkCommandPool& vkCommandPool)
-            {
-                vkDestroyCommandPool(m_vkDevice, vkCommandPool, nullptr);
-                vkCommandPool = nullptr;
-            });
+        for (int familyType = 0; familyType < QueueFamilyType_Count; ++familyType)
+        {
+            std::ranges::for_each(m_vkCommandPools[familyType], [this](VkCommandPool vkCommandPool)
+                {
+                    vkDestroyCommandPool(m_vkDevice, vkCommandPool, nullptr);
+                });
+            m_vkCommandPools[familyType].clear();
+        }
 
         vkDestroyDevice(m_vkDevice, nullptr);
         m_vkDevice = nullptr;
@@ -263,9 +265,16 @@ namespace Vulkan
         return m_vkQueues[queueFamilyType];
     }
 
-    VkCommandPool Device::GetVkCommandPool(QueueFamilyType queueFamilyType)
+    VkCommandPool Device::GetVkCommandPool(QueueFamilyType queueFamilyType, int index)
     {
-        return m_vkCommandPools[queueFamilyType];
+        if (index < m_vkCommandPools[queueFamilyType].size())
+        {
+            return m_vkCommandPools[queueFamilyType][index];
+        }
+        else
+        {
+            return nullptr;
+        }
     }
 
     VkDescriptorPool Device::GetVkDescriptorPool()
@@ -281,6 +290,15 @@ namespace Vulkan
     const VkPhysicalDeviceProperties* Device::GetVkPhysicalDeviceProperties() const
     {
         return m_vkPhysicalDeviceProperties.get();
+    }
+
+    void Device::ResetVkCommandPool(QueueFamilyType queueFamilyType, int index)
+    {
+        if (index < m_vkCommandPools[queueFamilyType].size())
+        {
+            vkResetCommandPool(m_vkDevice, 
+                m_vkCommandPools[queueFamilyType][index], 0/*VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT*/);
+        }
     }
 
     bool Device::ObtainVkPhysicalDevice()
@@ -406,7 +424,7 @@ namespace Vulkan
 
     bool Device::CreateVkCommandPools()
     {
-        // Create one command pool for each queue family type.
+        // Create MaxFrameDraws command pools for each queue family type.
         for (int familyType = 0; familyType < QueueFamilyType_Count; ++familyType)
         {
             VkCommandPoolCreateInfo vkCommandPoolCreateInfo = {};
@@ -415,11 +433,26 @@ namespace Vulkan
             vkCommandPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Allows to reset command buffers
             vkCommandPoolCreateInfo.queueFamilyIndex = m_queueFamilyInfo.m_familyTypeToFamilyIndices[familyType];
 
-            if (vkCreateCommandPool(m_vkDevice, &vkCommandPoolCreateInfo, nullptr, &m_vkCommandPools[familyType]) != VK_SUCCESS)
+            m_vkCommandPools[familyType].resize(MaxFrameDraws, nullptr);
+            for (int frameIndex = 0; frameIndex < MaxFrameDraws; ++frameIndex)
+            {
+                if (vkCreateCommandPool(m_vkDevice, 
+                    &vkCommandPoolCreateInfo, nullptr, &m_vkCommandPools[familyType][frameIndex]) != VK_SUCCESS)
+                {
+                    DX_LOG(Error, "Vulkan Device", "Failed to create Vulkan command pool.");
+                    return false;
+                }
+            }
+
+            // Add another pool for command buffers used for resource transfer commands
+            VkCommandPool transferCommandPool = nullptr;
+            if (vkCreateCommandPool(m_vkDevice, 
+                &vkCommandPoolCreateInfo, nullptr, &transferCommandPool) != VK_SUCCESS)
             {
                 DX_LOG(Error, "Vulkan Device", "Failed to create Vulkan command pool.");
                 return false;
             }
+            m_vkCommandPools[familyType].push_back(transferCommandPool);
         }
 
         return true;

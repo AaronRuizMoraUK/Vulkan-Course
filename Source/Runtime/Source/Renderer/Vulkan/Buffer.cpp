@@ -146,7 +146,8 @@ namespace Vulkan
         {
             // Command buffer for transfer commands.
             // By Vulkan standards, graphical queues also support transfer commands.
-            CommandBuffer transferCmdBuffer(device, device->GetVkCommandPool(QueueFamilyType_Graphics));
+            CommandBuffer transferCmdBuffer(device, 
+                device->GetVkCommandPool(QueueFamilyType_Graphics, ResourceTransferCommandPoolIndex));
             if (transferCmdBuffer.Initialize())
             {
                 // Record transfer commands to the command buffer.

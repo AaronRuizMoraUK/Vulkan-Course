@@ -7,6 +7,11 @@ typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
 
 namespace Vulkan
 {
+    namespace Validation
+    {
+        extern const bool DebugEnabled;
+    }
+
     // Manages the Vulkan Instance and validation layers
     class Instance
     {

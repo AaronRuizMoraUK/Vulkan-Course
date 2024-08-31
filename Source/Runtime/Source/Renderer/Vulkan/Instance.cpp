@@ -18,9 +18,9 @@ namespace Vulkan
     namespace Validation
     {
 #ifdef _DEBUG
-        static const bool DebugEnabled = true;
+        const bool DebugEnabled = true;
 #else
-        static const bool DebugEnabled = false;
+        const bool DebugEnabled = false;
 #endif
 
         static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(

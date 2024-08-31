@@ -20,6 +20,9 @@ namespace Vulkan
     // won't affect the one being presented.
     constexpr int MaxFrameDraws = 2;
 
+    // Index of the command pool used for transferring resources
+    constexpr int ResourceTransferCommandPoolIndex = MaxFrameDraws;
+
     // Max number of objects allowed to render. Used to allocate per-object buffers.
     constexpr int MaxObjects = 1024;
 
@@ -72,12 +75,18 @@ namespace Vulkan
         VkDevice GetVkDevice();
         VkPhysicalDevice GetVkPhysicalDevice();
         VkQueue GetVkQueue(QueueFamilyType queueFamilyType);
-        VkCommandPool GetVkCommandPool(QueueFamilyType queueFamilyType);
+        VkCommandPool GetVkCommandPool(QueueFamilyType queueFamilyType, int index);
         VkDescriptorPool GetVkDescriptorPool();
 
         const VkPhysicalDeviceProperties* GetVkPhysicalDeviceProperties() const;
 
         const QueueFamilyInfo& GetQueueFamilyInfo() const;
+
+        // Resetting a command pool recycles all of the resources from all of the
+        // command buffers allocated from the command pool back to the command pool.
+        // In addition, all command buffers that have been allocated from the command
+        // pool are put in the initial state.
+        void ResetVkCommandPool(QueueFamilyType queueFamilyType, int index);
 
     private:
         Instance* m_instance = nullptr;
@@ -94,7 +103,7 @@ namespace Vulkan
         VkDevice m_vkDevice = nullptr;
         std::array<VkQueue, QueueFamilyType_Count> m_vkQueues;
 
-        std::array<VkCommandPool, QueueFamilyType_Count> m_vkCommandPools;
+        std::array<std::vector<VkCommandPool>, QueueFamilyType_Count> m_vkCommandPools;
 
         VkDescriptorPool m_vkDescriptorPool = nullptr;
     };
