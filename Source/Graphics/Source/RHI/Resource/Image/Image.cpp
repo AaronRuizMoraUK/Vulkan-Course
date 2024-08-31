@@ -12,7 +12,7 @@ namespace Vulkan
     namespace Utils
     {
         bool CreateVkImage(
-            VkDevice vkDevice,
+            Device* device,
             const std::vector<uint32_t>& uniqueFamilyIndices,
             const Math::Vector3Int& size,
             VkFormat vkFormat,
@@ -47,13 +47,22 @@ namespace Vulkan
             }
             vkImageCreateInfo.initialLayout; // TODO
 
-            if (vkCreateImage(vkDevice, &vkImageCreateInfo, nullptr, vkImageOut) != VK_SUCCESS)
+            if (vkCreateImage(device->GetVkDevice(), &vkImageCreateInfo, nullptr, vkImageOut) != VK_SUCCESS)
             {
                 DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image.");
                 return false;
             }
 
             return true;
+        }
+
+        void DestroyVkImage(Device* device, VkImage& vkImage, VkDeviceMemory& vkImageMemory)
+        {
+            vkDestroyImage(device->GetVkDevice(), vkImage, nullptr);
+            vkImage = nullptr;
+
+            vkFreeMemory(device->GetVkDevice(), vkImageMemory, nullptr);
+            vkImageMemory = nullptr;
         }
     } // Utils
 
@@ -91,11 +100,15 @@ namespace Vulkan
         DX_LOG(Info, "Vulkan Image", "Terminating Vulkan Image...");
 
         const bool skipDestruction = m_desc.m_initialDataIsNativeResource && !m_desc.m_ownInitialNativeResource;
-        if (!skipDestruction)
+        if (skipDestruction)
         {
-            vkDestroyImage(m_device->GetVkDevice(), m_vkImage, nullptr);
+            m_vkImage = nullptr;
+            m_vkImageMemory = nullptr;
         }
-        m_vkImage = nullptr;
+        else
+        {
+            Utils::DestroyVkImage(m_device, m_vkImage, m_vkImageMemory);
+        }
     }
 
     VkImage Image::GetVkImage()
@@ -114,6 +127,7 @@ namespace Vulkan
             }
 
             m_vkImage = static_cast<VkImage>(const_cast<void*>(m_desc.m_initialData));
+            // The image passed in initial data must be linked already to memory.
         }
         else
         {

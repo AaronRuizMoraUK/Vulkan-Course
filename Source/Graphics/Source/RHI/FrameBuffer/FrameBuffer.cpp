@@ -16,7 +16,7 @@ namespace Vulkan
     namespace Utils
     {
         bool CreateVkImageView(
-            VkDevice vkDevice, 
+            Device* device, 
             VkImage vkImage, 
             VkFormat vkFormat, 
             VkImageAspectFlags vkAspectFlags, 
@@ -41,13 +41,19 @@ namespace Vulkan
             vkImageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
             vkImageViewCreateInfo.subresourceRange.layerCount = 1;
 
-            if (vkCreateImageView(vkDevice, &vkImageViewCreateInfo, nullptr, vkImageViewOut) != VK_SUCCESS)
+            if (vkCreateImageView(device->GetVkDevice(), &vkImageViewCreateInfo, nullptr, vkImageViewOut) != VK_SUCCESS)
             {
                 DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image View.");
                 return false;
             }
 
             return true;
+        }
+
+        void DestroyVkImageView(Device* device, VkImageView& vkImageView)
+        {
+            vkDestroyImageView(device->GetVkDevice(), vkImageView, nullptr);
+            vkImageView = nullptr;
         }
     } // namespace Utils
 
@@ -100,14 +106,13 @@ namespace Vulkan
         vkDestroyFramebuffer(m_device->GetVkDevice(), m_vkFrameBuffer, nullptr);
         m_vkFrameBuffer = nullptr;
 
-        vkDestroyImageView(m_device->GetVkDevice(), m_vkDepthStencilImageView, nullptr);
-        m_vkDepthStencilImageView = nullptr;
+        Utils::DestroyVkImageView(m_device, m_vkDepthStencilImageView);
         // Depth image is destroyed when m_desc.m_depthStencilAttachment.m_image
         // gets out of scope and the shared_ptr counter gets to zero
 
         std::ranges::for_each(m_vkColorImageViews, [this](VkImageView vkImageView)
             {
-                vkDestroyImageView(m_device->GetVkDevice(), vkImageView, nullptr);
+                Utils::DestroyVkImageView(m_device, vkImageView);
             });
         m_vkColorImageViews.clear();
         // Color images are destroyed when m_desc.m_colorAttachments[].m_image
@@ -136,7 +141,7 @@ namespace Vulkan
         for (auto& colorAttachment : m_desc.m_colorAttachments)
         {
             VkImageView vkColorImageView = nullptr;
-            if (!Utils::CreateVkImageView(m_device->GetVkDevice(), 
+            if (!Utils::CreateVkImageView(m_device, 
                 colorAttachment.m_image->GetVkImage(),
                 ToVkFormat(colorAttachment.m_viewFormat),
                 VK_IMAGE_ASPECT_COLOR_BIT, 
@@ -182,7 +187,7 @@ namespace Vulkan
 
         if (m_desc.m_depthStencilAttachment.m_image)
         {
-            if (!Utils::CreateVkImageView(m_device->GetVkDevice(),
+            if (!Utils::CreateVkImageView(m_device,
                 m_desc.m_depthStencilAttachment.m_image->GetVkImage(),
                 ToVkFormat(m_desc.m_depthStencilAttachment.m_viewFormat),
                 VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
