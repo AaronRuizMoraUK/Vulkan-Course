@@ -90,7 +90,7 @@ namespace Vulkan
             return vkSurfaceCapabilities.maxImageCount <= 0;
         }
 
-        // Best format is subjective, but ours will be:
+        // Best surface format is subjective, but ours will be:
         // Format: VK_FORMAT_R8G8B8A8_UNORM or VK_FORMAT_B8G8R8A8_UNORM
         // ColorSpace: VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
         VkSurfaceFormatKHR ChooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& vkSurfaceFormats)
@@ -394,9 +394,14 @@ namespace Vulkan
             imageDesc.m_dimensions = Math::Vector3Int(m_imageSize.x, m_imageSize.y, 0);
             imageDesc.m_mipCount = 1;
             imageDesc.m_format = m_imageFormat;
-            imageDesc.m_initialDataIsNativeResource = true;
-            imageDesc.m_initialData = vkSwapChainImage;
-            imageDesc.m_ownInitialNativeResource = false;
+            imageDesc.m_tiling = ImageTiling::Optimal;
+            imageDesc.m_usageFlags = ImageUsage_ColorAttachment;
+            imageDesc.m_memoryProperty = ResourceMemoryProperty::DeviceLocal;
+            imageDesc.m_nativeResource = ImageDesc::NativeResource {
+               .m_imageNativeResource = vkSwapChainImage,
+               .m_imageMemoryNativeResource = nullptr,
+               .m_ownsNativeResource = false
+            };
 
             auto image = std::make_shared<Image>(m_device, imageDesc);
             if (!image->Initialize())

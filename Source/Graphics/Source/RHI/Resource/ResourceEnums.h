@@ -2,6 +2,16 @@
 
 namespace Vulkan
 {
+    enum class ResourceMemoryProperty
+    {
+        Unknown = 0,
+
+        HostVisible, // Visible by CPU. Suitable for data that needs to be updated regularly. Non-optimal for GPU performance.
+        DeviceLocal, // Accessible by GPU only. Data set during resource creation. Optimal for GPU performance.
+
+        Count
+    };
+
     enum class ResourceFormat
     {
         Unknown,

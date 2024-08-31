@@ -1,6 +1,7 @@
 #include <RHI/Resource/Image/Image.h>
 
 #include <RHI/Device/Device.h>
+#include <RHI/Vulkan/Utils.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -13,44 +14,82 @@ namespace Vulkan
     {
         bool CreateVkImage(
             Device* device,
-            const std::vector<uint32_t>& uniqueFamilyIndices,
-            const Math::Vector3Int& size,
+            VkImageType vkImageType,
+            const Math::Vector3Int& dimensions,
+            uint32_t mipCount,
             VkFormat vkFormat,
+            VkImageTiling vkImageTiling,
             VkImageUsageFlags vkImageUsageFlags,
-            VkImage* vkImageOut)
+            VkMemoryPropertyFlags vkMemoryPropertyFlags,
+            VkImage* vkImageOut,
+            VkDeviceMemory* vkImageMemoryOut)
         {
-            VkImageCreateInfo vkImageCreateInfo = {};
-            vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-            vkImageCreateInfo.pNext = nullptr;
-            vkImageCreateInfo.flags = 0;
-            vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-            vkImageCreateInfo.format = vkFormat;
-            vkImageCreateInfo.extent.width = size.x;
-            vkImageCreateInfo.extent.height = size.y;
-            vkImageCreateInfo.extent.depth = size.z;
-            vkImageCreateInfo.mipLevels = 1;
-            vkImageCreateInfo.arrayLayers = 1;
-            vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-            vkImageCreateInfo.tiling; // TODO
-            vkImageCreateInfo.usage = vkImageUsageFlags;
-            if (uniqueFamilyIndices.size() > 1)
+            // Create Image object
             {
-                vkImageCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-                vkImageCreateInfo.queueFamilyIndexCount = static_cast<uint32_t>(uniqueFamilyIndices.size());
-                vkImageCreateInfo.pQueueFamilyIndices = uniqueFamilyIndices.data();
-            }
-            else
-            {
-                vkImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-                vkImageCreateInfo.queueFamilyIndexCount = 0;
-                vkImageCreateInfo.pQueueFamilyIndices = nullptr;
-            }
-            vkImageCreateInfo.initialLayout; // TODO
+                // If queue families use different queues, then image must be shared between families.
+                const std::vector<uint32_t>& uniqueFamilyIndices = device->GetQueueFamilyInfo().m_uniqueQueueFamilyIndices;
 
-            if (vkCreateImage(device->GetVkDevice(), &vkImageCreateInfo, nullptr, vkImageOut) != VK_SUCCESS)
+                VkImageCreateInfo vkImageCreateInfo = {};
+                vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+                vkImageCreateInfo.pNext = nullptr;
+                vkImageCreateInfo.flags = 0;
+                vkImageCreateInfo.imageType = vkImageType;
+                vkImageCreateInfo.format = vkFormat;
+                vkImageCreateInfo.extent.width = dimensions.x;
+                vkImageCreateInfo.extent.height = dimensions.y;
+                vkImageCreateInfo.extent.depth = dimensions.z;
+                vkImageCreateInfo.mipLevels = mipCount;
+                vkImageCreateInfo.arrayLayers = 1;
+                vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
+                vkImageCreateInfo.tiling = vkImageTiling;
+                vkImageCreateInfo.usage = vkImageUsageFlags;
+                if (uniqueFamilyIndices.size() > 1)
+                {
+                    vkImageCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+                    vkImageCreateInfo.queueFamilyIndexCount = static_cast<uint32_t>(uniqueFamilyIndices.size());
+                    vkImageCreateInfo.pQueueFamilyIndices = uniqueFamilyIndices.data();
+                }
+                else
+                {
+                    vkImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+                    vkImageCreateInfo.queueFamilyIndexCount = 0;
+                    vkImageCreateInfo.pQueueFamilyIndices = nullptr;
+                }
+                vkImageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout of image data on creation
+
+                if (vkCreateImage(device->GetVkDevice(), &vkImageCreateInfo, nullptr, vkImageOut) != VK_SUCCESS)
+                {
+                    DX_LOG(Error, "Vulkan Image", "Failed to create Vulkan Image.");
+                    return false;
+                }
+            }
+
+            // Allocate memory for image and link them together
             {
-                DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image.");
-                return false;
+                // Get Buffer's Memory Requirements
+                VkMemoryRequirements vkMemoryRequirements = {};
+                vkGetImageMemoryRequirements(device->GetVkDevice(), *vkImageOut, &vkMemoryRequirements);
+
+                // Allocate memory for the image
+                VkMemoryAllocateInfo vkMemoryAllocateInfo = {};
+                vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                vkMemoryAllocateInfo.pNext = nullptr;
+                vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
+                vkMemoryAllocateInfo.memoryTypeIndex = FindCompatibleMemoryTypeIndex(
+                    device->GetVkPhysicalDevice(), vkMemoryRequirements.memoryTypeBits, vkMemoryPropertyFlags);
+
+                if (vkAllocateMemory(device->GetVkDevice(), &vkMemoryAllocateInfo, nullptr, vkImageMemoryOut) != VK_SUCCESS)
+                {
+                    DX_LOG(Error, "Vulkan Image", "Failed to allocate memory for Vulkan Buffer.");
+                    return false;
+                }
+
+                // Link the image to the memory
+                if (vkBindImageMemory(device->GetVkDevice(), *vkImageOut, *vkImageMemoryOut, 0) != VK_SUCCESS)
+                {
+                    DX_LOG(Error, "Vulkan Image", "Failed to bind Vulkan image to memory.");
+                    return false;
+                }
             }
 
             return true;
@@ -99,7 +138,16 @@ namespace Vulkan
     {
         DX_LOG(Info, "Vulkan Image", "Terminating Vulkan Image...");
 
-        const bool skipDestruction = m_desc.m_initialDataIsNativeResource && !m_desc.m_ownInitialNativeResource;
+        if (m_vkImage && !m_desc.m_nativeResource.has_value())
+        {
+            DX_LOG(Verbose, "Vulkan Image", "Image %s %dx%dx%d and %d mipmaps destroyed.",
+                ImageTypeStr(m_desc.m_imageType), m_desc.m_dimensions.x, m_desc.m_dimensions.y, m_desc.m_dimensions.z, m_desc.m_mipCount);
+        }
+
+        const bool skipDestruction = 
+            m_desc.m_nativeResource.has_value() && 
+            !m_desc.m_nativeResource->m_ownsNativeResource;
+
         if (skipDestruction)
         {
             m_vkImage = nullptr;
@@ -118,23 +166,78 @@ namespace Vulkan
 
     bool Image::CreateVkImage()
     {
-        if (m_desc.m_initialDataIsNativeResource)
+        if (m_desc.m_usageFlags == 0)
         {
-            if (!m_desc.m_initialData)
+            DX_LOG(Error, "Vulkan Image", "Image description with no usage flag set.");
+            return false;
+        }
+
+        if (m_desc.m_nativeResource.has_value())
+        {
+            if (!m_desc.m_nativeResource->m_imageNativeResource)
             {
-                DX_LOG(Fatal, "Vulkan Image", "Image description with invalid data.");
+                DX_LOG(Error, "Vulkan Image", "Image description with invalid data.");
+                return false;
+            }
+            else if (m_desc.m_nativeResource->m_ownsNativeResource && 
+                !m_desc.m_nativeResource->m_imageMemoryNativeResource)
+            {
+                DX_LOG(Error, "Vulkan Image",
+                    "Indicated that the image should own the resources but image memory was not provided.");
                 return false;
             }
 
-            m_vkImage = static_cast<VkImage>(const_cast<void*>(m_desc.m_initialData));
-            // The image passed in initial data must be linked already to memory.
+            m_vkImage = static_cast<VkImage>(m_desc.m_nativeResource->m_imageNativeResource);
+            m_vkImageMemory = static_cast<VkDeviceMemory>(m_desc.m_nativeResource->m_imageMemoryNativeResource);
+
+            // NOTE: Expected that the VkImage is already linked to the VkDeviceMemory.
+
+            // When native resource are directly provided, the initial data will be ignored since
+            // there is no enough information about the image and its memory to perform a copy.
+            if (m_desc.m_initialData != nullptr)
+            {
+                DX_LOG(Warning, "Vulkan Image", 
+                    "Initial data provided will be ignored since the image native resources was directly provided.");
+            }
+            return true;
         }
-        else
+
+        const VkImageUsageFlags vkImageUsageFlags = ToVkBufferUsageFlags(m_desc.m_usageFlags);
+
+        const VkMemoryPropertyFlags vkMemoryProperties = [this]() -> int
+            {
+                switch (m_desc.m_memoryProperty)
+                {
+                case ResourceMemoryProperty::HostVisible:
+                    return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+                case ResourceMemoryProperty::DeviceLocal:
+                    return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+                default:
+                    DX_LOG(Fatal, "Vulkan Image", "Unexpected resource memory property %d.", m_desc.m_memoryProperty);
+                    return 0;
+                }
+            }();
+
+        if (!Utils::CreateVkImage(m_device, 
+            ToVkImageType(m_desc.m_imageType),
+            m_desc.m_dimensions,
+            m_desc.m_mipCount,
+            ToVkFormat(m_desc.m_format),
+            ToVkImageTiling(m_desc.m_tiling),
+            vkImageUsageFlags,
+            vkMemoryProperties,
+            &m_vkImage,
+            &m_vkImageMemory))
         {
-            // TODO
-            DX_ASSERT(false, "Vulkan Image", "Not implemented!");
             return false;
         }
+
+        // TODO: copy initial data handling the different possible m_desc.m_memoryProperty
+
+        DX_LOG(Verbose, "Vulkan Image", "Image %s %dx%dx%d and %d mipmaps created.",
+            ImageTypeStr(m_desc.m_imageType), m_desc.m_dimensions.x, m_desc.m_dimensions.y, m_desc.m_dimensions.z, m_desc.m_mipCount);
 
         return true;
     }

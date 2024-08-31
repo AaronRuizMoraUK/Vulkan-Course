@@ -37,7 +37,7 @@ namespace DX
             vertexBufferDesc.m_elementSizeInBytes = GetVertexSize();
             vertexBufferDesc.m_elementCount = static_cast<uint32_t>(m_vertexData.size());
             vertexBufferDesc.m_usageFlags = Vulkan::BufferUsage_VertexBuffer;
-            vertexBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::DeviceLocal;
+            vertexBufferDesc.m_memoryProperty = Vulkan::ResourceMemoryProperty::DeviceLocal;
             vertexBufferDesc.m_initialData = m_vertexData.data();
 
             m_vertexBuffer = std::make_shared<Vulkan::Buffer>(renderer->GetDevice(), vertexBufferDesc);
@@ -54,7 +54,7 @@ namespace DX
             indexBufferDesc.m_elementSizeInBytes = GetIndexSize();
             indexBufferDesc.m_elementCount = static_cast<uint32_t>(m_indexData.size());
             indexBufferDesc.m_usageFlags = Vulkan::BufferUsage_IndexBuffer;
-            indexBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::DeviceLocal;
+            indexBufferDesc.m_memoryProperty = Vulkan::ResourceMemoryProperty::DeviceLocal;
             indexBufferDesc.m_initialData = m_indexData.data();
 
             m_indexBuffer = std::make_shared<Vulkan::Buffer>(renderer->GetDevice(), indexBufferDesc);

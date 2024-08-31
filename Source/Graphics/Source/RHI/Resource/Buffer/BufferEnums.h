@@ -12,14 +12,4 @@ namespace Vulkan
         BufferUsage_UniformBuffer = 1 << 2,
     };
     using BufferUsageFlags = uint32_t;
-
-    enum class BufferMemoryProperty
-    {
-        Unknown = 0,
-
-        HostVisible, // Visible by CPU. Suitable for data that needs to be updated regularly. Non-optimal for GPU performance.
-        DeviceLocal, // Accessible by GPU only. Data set during buffer creation. Optimal for GPU performance.
-
-        Count
-    };
 } // namespace Vulkan

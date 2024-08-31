@@ -2,8 +2,39 @@
 
 #include <Log/Log.h>
 
+#include <limits>
+
 namespace Vulkan
 {
+    // Finds the index of the memory type which is in the allowed list and has all the properties passed by argument.
+    uint32_t FindCompatibleMemoryTypeIndex(
+        VkPhysicalDevice vkPhysicalDevice, uint32_t allowedMemoryTypes, VkMemoryPropertyFlags properties)
+    {
+        // Get properties of the physical device memory
+        VkPhysicalDeviceMemoryProperties vkPhysicalDeviceMemoryProperties = {};
+        vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &vkPhysicalDeviceMemoryProperties);
+
+        // For each memory type
+        for (uint32_t i = 0; i < vkPhysicalDeviceMemoryProperties.memoryTypeCount; ++i)
+        {
+            // allowedMemoryTypes is a bit field where each bit is an allowed type,
+            // since it's an uint32_t (32 bits) that's 32 different types possible.
+            // First one would be the first bit, second would be second bit and so on. 
+            const bool allowedMemoryType = (allowedMemoryTypes & (1 << i));
+
+            const bool supportsProperties =
+                (vkPhysicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties;
+
+            if (allowedMemoryType && supportsProperties)
+            {
+                return i;
+            }
+        }
+
+        DX_LOG(Warning, "Utils", "Compatible memory not found!");
+        return std::numeric_limits<uint32_t>::max();
+    }
+
     VkFormat ToVkFormat(ResourceFormat format)
     {
         switch (format)
@@ -420,6 +451,47 @@ namespace Vulkan
             DX_LOG(Fatal, "Utils", "Unknown resource format %d", vkFormat);
             return ResourceFormat::Unknown;
         }
+    }
+
+    VkImageType ToVkImageType(ImageType imageType)
+    {
+        switch (imageType)
+        {
+        case ImageType::Image1D: return VK_IMAGE_TYPE_1D;
+        case ImageType::Image2D: return VK_IMAGE_TYPE_2D;
+        case ImageType::Image3D: return VK_IMAGE_TYPE_3D;
+
+        case ImageType::Unknown:
+        default:
+            DX_LOG(Fatal, "Utils", "Unknown image type %d", imageType);
+            return VK_IMAGE_TYPE_MAX_ENUM;
+        }
+    }
+
+    VkImageTiling ToVkImageTiling(ImageTiling imageTiling)
+    {
+        switch (imageTiling)
+        {
+        case ImageTiling::Optimal: return VK_IMAGE_TILING_OPTIMAL;
+        case ImageTiling::Linear: return VK_IMAGE_TILING_LINEAR;
+
+        case ImageTiling::Unknown:
+        default:
+            DX_LOG(Fatal, "Utils", "Unknown image tiling %d", imageTiling);
+            return VK_IMAGE_TILING_MAX_ENUM;
+        }
+    }
+
+    VkImageUsageFlags ToVkImageUsageFlags(ImageUsageFlags flags)
+    {
+        VkImageUsageFlags vkImageUsageFlags = 0;
+
+        vkImageUsageFlags |= (flags & ImageUsage_Sampled) ? VK_IMAGE_USAGE_SAMPLED_BIT : 0;
+        vkImageUsageFlags |= (flags & ImageUsage_Storage) ? VK_IMAGE_USAGE_STORAGE_BIT : 0;
+        vkImageUsageFlags |= (flags & ImageUsage_ColorAttachment) ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : 0;
+        vkImageUsageFlags |= (flags & ImageUsage_DepthStencilAttachment) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : 0;
+
+        return vkImageUsageFlags;
     }
 
     VkBufferUsageFlags ToVkBufferUsageFlags(BufferUsageFlags flags)

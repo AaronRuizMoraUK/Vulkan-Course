@@ -434,7 +434,7 @@ namespace DX
         viewProjBufferDesc.m_elementSizeInBytes = sizeof(ViewProjBuffer);
         viewProjBufferDesc.m_elementCount = 1;
         viewProjBufferDesc.m_usageFlags = Vulkan::BufferUsage_UniformBuffer;
-        viewProjBufferDesc.m_memoryProperty = Vulkan::BufferMemoryProperty::HostVisible;
+        viewProjBufferDesc.m_memoryProperty = Vulkan::ResourceMemoryProperty::HostVisible;
         viewProjBufferDesc.m_initialData = nullptr; // ViewProj data will be set every frame to this buffer
 
         m_commandBuffers.resize(Vulkan::MaxFrameDraws);

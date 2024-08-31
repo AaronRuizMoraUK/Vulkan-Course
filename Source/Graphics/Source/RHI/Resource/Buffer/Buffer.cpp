@@ -35,35 +35,6 @@ namespace Vulkan
             Device* m_device = nullptr;
         };
 
-        // Finds the index of the memory type which is in the allowed list and has all the properties passed by argument.
-        uint32_t FindCompatibleMemoryTypeIndex(
-            VkPhysicalDevice vkPhysicalDevice, uint32_t allowedMemoryTypes, VkMemoryPropertyFlags properties)
-        {
-            // Get properties of the physical device memory
-            VkPhysicalDeviceMemoryProperties vkPhysicalDeviceMemoryProperties = {};
-            vkGetPhysicalDeviceMemoryProperties(vkPhysicalDevice, &vkPhysicalDeviceMemoryProperties);
-
-            // For each memory type
-            for (uint32_t i = 0; i < vkPhysicalDeviceMemoryProperties.memoryTypeCount; ++i)
-            {
-                // allowedMemoryTypes is a bit field where each bit is an allowed type,
-                // since it's an uint32_t (32 bits) that's 32 different types possible.
-                // First one would be the first bit, second would be second bit and so on. 
-                const bool allowedMemoryType = (allowedMemoryTypes & (1 << i));
-
-                const bool supportsProperties = 
-                    (vkPhysicalDeviceMemoryProperties.memoryTypes[i].propertyFlags & properties) == properties;
-
-                if (allowedMemoryType && supportsProperties)
-                {
-                    return i;
-                }
-            }
-
-            DX_LOG(Warning, "Vulkan Buffer", "Compatible memory for buffer not found!");
-            return std::numeric_limits<uint32_t>::max();
-        }
-
         bool CreateVkBuffer(Device* device,
             size_t bufferSize,
             VkBufferUsageFlags vkBufferUsageFlags, 
@@ -102,7 +73,7 @@ namespace Vulkan
                 }
             }
 
-            // Allocate memory for buffer and bind them together
+            // Allocate memory for buffer and link them together
             {
                 // Get Buffer's Memory Requirements
                 VkMemoryRequirements vkMemoryRequirements = {};
@@ -113,7 +84,7 @@ namespace Vulkan
                 vkMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
                 vkMemoryAllocateInfo.pNext = nullptr;
                 vkMemoryAllocateInfo.allocationSize = vkMemoryRequirements.size;
-                vkMemoryAllocateInfo.memoryTypeIndex = Utils::FindCompatibleMemoryTypeIndex(
+                vkMemoryAllocateInfo.memoryTypeIndex = FindCompatibleMemoryTypeIndex(
                     device->GetVkPhysicalDevice(), vkMemoryRequirements.memoryTypeBits, vkMemoryPropertyFlags);
 
                 if (vkAllocateMemory(device->GetVkDevice(), &vkMemoryAllocateInfo, nullptr, vkBufferMemoryOut) != VK_SUCCESS)
@@ -122,7 +93,7 @@ namespace Vulkan
                     return false;
                 }
 
-                // Bind the buffer to the memory
+                // Link the buffer to the memory
                 if (vkBindBufferMemory(device->GetVkDevice(), *vkBufferOut, *vkBufferMemoryOut, 0) != VK_SUCCESS)
                 {
                     DX_LOG(Error, "Vulkan Buffer", "Failed to bind Vulkan buffer to memory.");
@@ -265,7 +236,7 @@ namespace Vulkan
 
     bool Buffer::UpdateBufferData(const void* data, size_t dataSize)
     {
-        if (m_desc.m_memoryProperty != BufferMemoryProperty::HostVisible)
+        if (m_desc.m_memoryProperty != ResourceMemoryProperty::HostVisible)
         {
             DX_LOG(Error, "Vulkan Buffer", "Only Host Visible buffers can update its data.");
             return false;
@@ -298,7 +269,7 @@ namespace Vulkan
 
         switch (m_desc.m_memoryProperty)
         {
-        case BufferMemoryProperty::HostVisible:
+        case ResourceMemoryProperty::HostVisible:
         {
             const VkBufferUsageFlags vkBufferUsageFlags = ToVkBufferUsageFlags(m_desc.m_usageFlags);
 
@@ -329,7 +300,7 @@ namespace Vulkan
             break;
         }
 
-        case BufferMemoryProperty::DeviceLocal:
+        case ResourceMemoryProperty::DeviceLocal:
         {
             // If there is initial data to copy, use a staging buffer to transfer the data to the GPU buffer
             if (m_desc.m_initialData)
@@ -398,7 +369,7 @@ namespace Vulkan
         }
 
         default:
-            DX_LOG(Fatal, "Vulkan Buffer", "Unexpected buffer memory property %d.", m_desc.m_memoryProperty);
+            DX_LOG(Fatal, "Vulkan Buffer", "Unexpected resource memory property %d.", m_desc.m_memoryProperty);
             return false;
         }
 

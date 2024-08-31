@@ -55,6 +55,36 @@ namespace Vulkan
             vkDestroyImageView(device->GetVkDevice(), vkImageView, nullptr);
             vkImageView = nullptr;
         }
+
+        ResourceFormat ChooseSupportedFormat(
+            Device* device,
+            const std::vector<ResourceFormat>& formats,
+            ImageTiling imageTiling,
+            VkFormatFeatureFlags vkFormatFeatureFlags)
+        {
+            // Loop through the formats provided and find a compatible one
+            for (ResourceFormat format : formats)
+            {
+                // Get properties of the format on this device
+                VkFormatProperties vkFormatProperties = {};
+                vkGetPhysicalDeviceFormatProperties(device->GetVkPhysicalDevice(), ToVkFormat(format), &vkFormatProperties);
+
+                // Does the format support all features we requested for optimal tiling?
+                if (imageTiling == ImageTiling::Optimal &&
+                    (vkFormatProperties.optimalTilingFeatures & vkFormatFeatureFlags) == vkFormatFeatureFlags)
+                {
+                    return format;
+                }
+                // Does the format support all features we requested for lineal tiling?
+                else if (imageTiling == ImageTiling::Linear &&
+                    (vkFormatProperties.linearTilingFeatures & vkFormatFeatureFlags) == vkFormatFeatureFlags)
+                {
+                    return format;
+                }
+            }
+
+            return ResourceFormat::Unknown;
+        }
     } // namespace Utils
 
     FrameBuffer::FrameBuffer(Device* device, VkRenderPass vkRenderPass, const FrameBufferDesc& desc)
@@ -166,15 +196,21 @@ namespace Vulkan
             {
                 const ImageDesc& imageDesc = m_desc.m_colorAttachments.front().m_image->GetImageDesc();
 
+                const ResourceFormat depthStencilFormat = Utils::ChooseSupportedFormat(m_device,
+                    { ResourceFormat::D32_SFLOAT_S8_UINT, ResourceFormat::D24_UNORM_S8_UINT },
+                    ImageTiling::Optimal,
+                    VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+                );
+
                 ImageDesc depthStencilImageDesc = {};
                 depthStencilImageDesc.m_imageType = ImageType::Image2D;
                 depthStencilImageDesc.m_dimensions = imageDesc.m_dimensions;
                 depthStencilImageDesc.m_mipCount = imageDesc.m_mipCount;
-                depthStencilImageDesc.m_format = ResourceFormat::D24_UNORM_S8_UINT;
-                //depthStencilImageDesc.m_usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+                depthStencilImageDesc.m_format = depthStencilFormat;
+                depthStencilImageDesc.m_tiling = ImageTiling::Optimal;
+                depthStencilImageDesc.m_usageFlags = ImageUsage_DepthStencilAttachment;
+                depthStencilImageDesc.m_memoryProperty = ResourceMemoryProperty::DeviceLocal;
 
-                // NOTE: Not created through owner device API to avoid having a
-                // reference in the device as this is a sub-object of FrameBuffer.
                 m_desc.m_depthStencilAttachment.m_image = std::make_shared<Image>(m_device, depthStencilImageDesc);
                 if (!m_desc.m_depthStencilAttachment.m_image->Initialize())
                 {

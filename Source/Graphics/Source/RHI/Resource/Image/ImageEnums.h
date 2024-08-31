@@ -14,4 +14,27 @@ namespace Vulkan
 
         Count
     };
+
+    const char* ImageTypeStr(ImageType imageType);
+
+    // Bitwise operations on ImageUsageFlag are allowed.
+    enum ImageUsageFlag
+    {
+        ImageUsage_Sampled = 1 << 0,
+        ImageUsage_Storage = 1 << 1,
+        ImageUsage_ColorAttachment = 1 << 2,
+        ImageUsage_DepthStencilAttachment = 1 << 3
+    };
+    using ImageUsageFlags = uint32_t;
+
+    // How memory is arranged for optimal reading
+    enum class ImageTiling
+    {
+        Unknown = 0,
+
+        Optimal,
+        Linear,
+
+        Count
+    };
 } // namespace Vulkan
