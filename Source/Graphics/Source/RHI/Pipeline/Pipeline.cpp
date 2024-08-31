@@ -2,6 +2,7 @@
 
 #include <RHI/Device/Device.h>
 #include <RHI/Pipeline/PipelineDescriptorSet.h>
+#include <RHI/Vulkan/Utils.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -57,7 +58,7 @@ namespace Vulkan
         }
     } // namespace Utils
 
-    Pipeline::Pipeline(Device* device, int imageFormat, const Math::Rectangle& viewport)
+    Pipeline::Pipeline(Device* device, ResourceFormat imageFormat, const Math::Rectangle& viewport)
         : m_device(device)
         , m_imageFormat(imageFormat)
         , m_viewport(viewport)
@@ -176,7 +177,7 @@ namespace Vulkan
         // Color attachment of the render pass
         const VkAttachmentDescription colorAttachment = {
             .flags = 0,
-            .format = static_cast<VkFormat>(m_imageFormat), // Format to use for attachment
+            .format = ToVkFormat(m_imageFormat), // Format to use for attachment
             .samples = VK_SAMPLE_COUNT_1_BIT, // Number of samples to write for MSAA
 
             .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // What to do with attachment before rendering

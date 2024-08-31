@@ -1,6 +1,8 @@
 #pragma once
 
-#include <RHI/Resource/Image/Image.h>
+#include <RHI/FrameBuffer/FrameBufferDesc.h>
+
+#include <Math/Vector2.h>
 
 typedef struct VkFramebuffer_T* VkFramebuffer;
 typedef struct VkRenderPass_T* VkRenderPass;
@@ -9,40 +11,40 @@ typedef struct VkImageView_T* VkImageView;
 namespace Vulkan
 {
     class Device;
+    class Image;
 
     // Manages the Vulkan Frame Buffer
     class FrameBuffer
     {
     public:
-        FrameBuffer(Device* device, VkRenderPass vkRenderPass, const Image& colorImage, const Image& depthImage = {});
+        FrameBuffer(Device* device, VkRenderPass vkRenderPass, const FrameBufferDesc& desc);
         ~FrameBuffer();
 
         FrameBuffer(const FrameBuffer&) = delete;
         FrameBuffer& operator=(const FrameBuffer&) = delete;
 
-        bool Initialize(bool createDepthAttachment = false);
+        bool Initialize();
         void Terminate();
+
+        const Math::Vector2Int& GetDimensions() const;
 
         VkRenderPass GetVkRenderPass();
         VkFramebuffer GetVkFrameBuffer();
 
-        const Image& GetColorImage() const;
-        const Image& GetDepthImage() const;
-
     private:
         Device* m_device = nullptr;
         VkRenderPass m_vkRenderPass = nullptr;
-        Image m_colorImage;
+        FrameBufferDesc m_desc;
 
     private:
-        bool CreateColorAttachment();
-        bool CreateDepthAttachment();
+        bool CreateColorAttachments();
+        bool CreateDepthStencilAttachment();
         bool CreateVkFrameBuffer();
 
-        VkImageView m_vkColorImageView = nullptr;
+        Math::Vector2Int m_dimensions;
 
-        Image m_depthImage;
-        VkImageView m_vkDepthImageView = nullptr;
+        std::vector<VkImageView> m_vkColorImageViews;
+        VkImageView m_vkDepthStencilImageView = nullptr;
 
         VkFramebuffer m_vkFrameBuffer = nullptr;
     };

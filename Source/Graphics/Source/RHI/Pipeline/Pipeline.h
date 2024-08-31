@@ -1,5 +1,7 @@
 #pragma once
 
+#include <RHI/Resource/ResourceEnums.h>
+
 #include <Math/Rectangle.h>
 
 #include <vector>
@@ -26,7 +28,7 @@ namespace Vulkan
     class Pipeline
     {
     public:
-        Pipeline(Device* device, int imageFormat, const Math::Rectangle& viewport);
+        Pipeline(Device* device, ResourceFormat imageFormat, const Math::Rectangle& viewport);
         ~Pipeline();
 
         Pipeline(const Pipeline&) = delete;
@@ -52,7 +54,7 @@ namespace Vulkan
 
     private:
         Device* m_device = nullptr;
-        int m_imageFormat = -1;
+        ResourceFormat m_imageFormat = ResourceFormat::Unknown;
         Math::Rectangle m_viewport;
 
     private:

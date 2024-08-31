@@ -115,7 +115,7 @@ namespace Vulkan
             clearValues.push_back(depthStencilClearValue);
         }
 
-        const auto& imageSize = frameBuffer->GetColorImage().m_size;
+        const auto& frameBufferDimensions = frameBuffer->GetDimensions();
 
         // Information about how to begin a render pass (only needed for graphics operations)
         VkRenderPassBeginInfo vkRenderPassBeginInfo = {};
@@ -124,8 +124,8 @@ namespace Vulkan
         vkRenderPassBeginInfo.renderPass = frameBuffer->GetVkRenderPass();
         vkRenderPassBeginInfo.framebuffer = frameBuffer->GetVkFrameBuffer();
         vkRenderPassBeginInfo.renderArea.offset = { 0, 0 };
-        vkRenderPassBeginInfo.renderArea.extent.width = static_cast<uint32_t>(imageSize.x);
-        vkRenderPassBeginInfo.renderArea.extent.height = static_cast<uint32_t>(imageSize.y);
+        vkRenderPassBeginInfo.renderArea.extent.width = static_cast<uint32_t>(frameBufferDimensions.x);
+        vkRenderPassBeginInfo.renderArea.extent.height = static_cast<uint32_t>(frameBufferDimensions.y);
         vkRenderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
         vkRenderPassBeginInfo.pClearValues = clearValues.data();
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <RHI/Resource/ResourceEnums.h>
+
 #include <Math/Vector2.h>
 
 #include <vector>
@@ -14,6 +16,7 @@ namespace Vulkan
 {
     class Device;
     class FrameBuffer;
+    class Image;
 
     // Manages the Vulkan SwapChain
     class SwapChain
@@ -33,7 +36,7 @@ namespace Vulkan
         bool CreateFrameBuffers(VkRenderPass vkRenderPass);
         void DestroyFrameBuffers();
 
-        int GetImageFormat() const;
+        ResourceFormat GetImageFormat() const;
         const Math::Vector2Int& GetImageSize() const;
 
         uint32_t GetImageCount() const;
@@ -46,11 +49,12 @@ namespace Vulkan
 
     private:
         bool CreateVkSwapChain();
+        std::vector<std::shared_ptr<Image>> ObtainImagesFromSwapChain();
 
         VkSwapchainKHR m_vkSwapChain = nullptr;
 
         uint32_t m_imageCount = 0;
-        int m_imageFormat = -1;
+        ResourceFormat m_imageFormat = ResourceFormat::Unknown;
         Math::Vector2Int m_imageSize = Math::Vector2Int(0);
 
         // Frame buffers for drawing into each swap chain image.

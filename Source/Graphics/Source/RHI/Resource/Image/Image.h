@@ -1,15 +1,39 @@
 #pragma once
 
-#include <Math/Vector2.h>
+#include <RHI/Resource/Image/ImageDesc.h>
 
 typedef struct VkImage_T* VkImage;
+typedef struct VkDeviceMemory_T* VkDeviceMemory;
 
 namespace Vulkan
 {
-    struct Image
+    class Device;
+
+    // Manages a Vulkan Image
+    class Image
     {
+    public:
+        Image(Device* device, const ImageDesc& desc);
+        ~Image();
+
+        Image(const Image&) = delete;
+        Image& operator=(const Image&) = delete;
+
+        bool Initialize();
+        void Terminate();
+
+        const ImageDesc& GetImageDesc() const { return m_desc; }
+
+        VkImage GetVkImage();
+
+    private:
+        Device* m_device = nullptr;
+        ImageDesc m_desc;
+
+    private:
+        bool CreateVkImage();
+
         VkImage m_vkImage = nullptr;
-        int m_vkFormat = -1;
-        Math::Vector2Int m_size = Math::Vector2Int(0, 0);
+        VkDeviceMemory m_vkImageMemory = nullptr;
     };
 } // namespace Vulkan

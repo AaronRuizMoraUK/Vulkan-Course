@@ -1,63 +1,20 @@
 #include <RHI/FrameBuffer/FrameBuffer.h>
 
 #include <RHI/Device/Device.h>
+#include <RHI/Resource/Image/Image.h>
+#include <RHI/Vulkan/Utils.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
 
 #include <vulkan/vulkan.h>
 
-#include <vector>
+#include <algorithm>
 
 namespace Vulkan
 {
     namespace Utils
     {
-        bool CreateVkImage(
-            VkDevice vkDevice, 
-            const std::vector<uint32_t>& uniqueFamilyIndices, 
-            const Math::Vector2Int& size, 
-            VkFormat vkFormat, 
-            VkImageUsageFlags vkImageUsageFlags, 
-            VkImage* vkImageOut)
-        {
-            VkImageCreateInfo vkImageCreateInfo = {};
-            vkImageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-            vkImageCreateInfo.pNext = nullptr;
-            vkImageCreateInfo.flags = 0;
-            vkImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-            vkImageCreateInfo.format = vkFormat;
-            vkImageCreateInfo.extent.width = size.x;
-            vkImageCreateInfo.extent.height = size.y;
-            vkImageCreateInfo.extent.depth = 0;
-            vkImageCreateInfo.mipLevels = 1;
-            vkImageCreateInfo.arrayLayers = 1;
-            vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-            vkImageCreateInfo.tiling; // TODO
-            vkImageCreateInfo.usage = vkImageUsageFlags;
-            if (uniqueFamilyIndices.size() > 1)
-            {
-                vkImageCreateInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-                vkImageCreateInfo.queueFamilyIndexCount = static_cast<uint32_t>(uniqueFamilyIndices.size());
-                vkImageCreateInfo.pQueueFamilyIndices = uniqueFamilyIndices.data();
-            }
-            else
-            {
-                vkImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-                vkImageCreateInfo.queueFamilyIndexCount = 0;
-                vkImageCreateInfo.pQueueFamilyIndices = nullptr;
-            }
-            vkImageCreateInfo.initialLayout; // TODO
-
-            if (vkCreateImage(vkDevice, &vkImageCreateInfo, nullptr, vkImageOut) != VK_SUCCESS)
-            {
-                DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image.");
-                return false;
-            }
-
-            return true;
-        }
-
         bool CreateVkImageView(
             VkDevice vkDevice, 
             VkImage vkImage, 
@@ -94,11 +51,10 @@ namespace Vulkan
         }
     } // namespace Utils
 
-    FrameBuffer::FrameBuffer(Device* device, VkRenderPass vkRenderPass, const Image& colorImage, const Image& depthImage)
+    FrameBuffer::FrameBuffer(Device* device, VkRenderPass vkRenderPass, const FrameBufferDesc& desc)
         : m_device(device)
         , m_vkRenderPass(vkRenderPass)
-        , m_colorImage(colorImage)
-        , m_depthImage(depthImage)
+        , m_desc(desc)
     {
     }
 
@@ -107,7 +63,7 @@ namespace Vulkan
         Terminate();
     }
 
-    bool FrameBuffer::Initialize(bool createDepthAttachment)
+    bool FrameBuffer::Initialize()
     {
         if (m_vkFrameBuffer)
         {
@@ -116,13 +72,13 @@ namespace Vulkan
 
         DX_LOG(Info, "Vulkan FrameBuffer", "Initializing Vulkan FrameBuffer...");
 
-        if (!CreateColorAttachment())
+        if (!CreateColorAttachments())
         {
             Terminate();
             return false;
         }
 
-        if (createDepthAttachment && !CreateDepthAttachment())
+        if (!CreateDepthStencilAttachment())
         {
             Terminate();
             return false;
@@ -144,14 +100,23 @@ namespace Vulkan
         vkDestroyFramebuffer(m_device->GetVkDevice(), m_vkFrameBuffer, nullptr);
         m_vkFrameBuffer = nullptr;
 
-        vkDestroyImageView(m_device->GetVkDevice(), m_vkDepthImageView, nullptr);
-        vkDestroyImage(m_device->GetVkDevice(), m_depthImage.m_vkImage, nullptr);
-        m_vkDepthImageView = nullptr;
-        m_depthImage = {};
+        vkDestroyImageView(m_device->GetVkDevice(), m_vkDepthStencilImageView, nullptr);
+        m_vkDepthStencilImageView = nullptr;
+        // Depth image is destroyed when m_desc.m_depthStencilAttachment.m_image
+        // gets out of scope and the shared_ptr counter gets to zero
 
-        vkDestroyImageView(m_device->GetVkDevice(), m_vkColorImageView, nullptr);
-        m_vkColorImageView = nullptr;
-        // Color image was passed to FrameBuffer, so it's not its responsibility to destroy it.
+        std::ranges::for_each(m_vkColorImageViews, [this](VkImageView vkImageView)
+            {
+                vkDestroyImageView(m_device->GetVkDevice(), vkImageView, nullptr);
+            });
+        m_vkColorImageViews.clear();
+        // Color images are destroyed when m_desc.m_colorAttachments[].m_image
+        // gets out of scope and the shared_ptr counter gets to zero
+    }
+
+    const Math::Vector2Int& FrameBuffer::GetDimensions() const
+    {
+        return m_dimensions;
     }
 
     VkRenderPass FrameBuffer::GetVkRenderPass()
@@ -164,49 +129,68 @@ namespace Vulkan
         return m_vkFrameBuffer;
     }
 
-    const Image& FrameBuffer::GetColorImage() const
+    bool FrameBuffer::CreateColorAttachments()
     {
-        return m_colorImage;
-    }
+        m_vkColorImageViews.reserve(m_desc.m_colorAttachments.size());
 
-    const Image& FrameBuffer::GetDepthImage() const
-    {
-        return m_depthImage;
-    }
-
-    bool FrameBuffer::CreateColorAttachment()
-    {
-        if (!Utils::CreateVkImageView(m_device->GetVkDevice(), m_colorImage.m_vkImage,
-            static_cast<VkFormat>(m_colorImage.m_vkFormat), VK_IMAGE_ASPECT_COLOR_BIT, &m_vkColorImageView))
+        for (auto& colorAttachment : m_desc.m_colorAttachments)
         {
-            DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image View for Color Image.");
-            return false;
+            VkImageView vkColorImageView = nullptr;
+            if (!Utils::CreateVkImageView(m_device->GetVkDevice(), 
+                colorAttachment.m_image->GetVkImage(),
+                ToVkFormat(colorAttachment.m_viewFormat),
+                VK_IMAGE_ASPECT_COLOR_BIT, 
+                &vkColorImageView))
+            {
+                DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image View for Color Attachment.");
+                return false;
+            }
+
+            m_vkColorImageViews.push_back(vkColorImageView);
         }
 
         return true;
     }
 
-
-    bool FrameBuffer::CreateDepthAttachment()
+    bool FrameBuffer::CreateDepthStencilAttachment()
     {
-        const VkFormat vkDepthImageFormat = VK_FORMAT_D24_UNORM_S8_UINT;
-
-        m_depthImage.m_size = m_colorImage.m_size;
-        m_depthImage.m_vkFormat = vkDepthImageFormat;
-
-        if (!Utils::CreateVkImage(m_device->GetVkDevice(),
-            m_device->GetQueueFamilyInfo().m_uniqueQueueFamilyIndices, m_depthImage.m_size,
-            vkDepthImageFormat, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &m_depthImage.m_vkImage))
+        if (!m_desc.m_depthStencilAttachment.m_image &&
+            m_desc.m_createDepthStencilAttachment)
         {
-            DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image View for Depth Attachment.");
-            return false;
+            if (!m_desc.m_colorAttachments.empty())
+            {
+                const ImageDesc& imageDesc = m_desc.m_colorAttachments.front().m_image->GetImageDesc();
+
+                ImageDesc depthStencilImageDesc = {};
+                depthStencilImageDesc.m_imageType = ImageType::Image2D;
+                depthStencilImageDesc.m_dimensions = imageDesc.m_dimensions;
+                depthStencilImageDesc.m_mipCount = imageDesc.m_mipCount;
+                depthStencilImageDesc.m_format = ResourceFormat::D24_UNORM_S8_UINT;
+                //depthStencilImageDesc.m_usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+
+                // NOTE: Not created through owner device API to avoid having a
+                // reference in the device as this is a sub-object of FrameBuffer.
+                m_desc.m_depthStencilAttachment.m_image = std::make_shared<Image>(m_device, depthStencilImageDesc);
+                if (!m_desc.m_depthStencilAttachment.m_image->Initialize())
+                {
+                    DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image for Depth Attachment.");
+                    return false;
+                }
+                m_desc.m_depthStencilAttachment.m_viewFormat = depthStencilImageDesc.m_format;
+            }
         }
 
-        if (!Utils::CreateVkImageView(m_device->GetVkDevice(), m_depthImage.m_vkImage,
-            vkDepthImageFormat, VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, &m_vkDepthImageView))
+        if (m_desc.m_depthStencilAttachment.m_image)
         {
-            DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image View for Depth Image.");
-            return false;
+            if (!Utils::CreateVkImageView(m_device->GetVkDevice(),
+                m_desc.m_depthStencilAttachment.m_image->GetVkImage(),
+                ToVkFormat(m_desc.m_depthStencilAttachment.m_viewFormat),
+                VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                &m_vkDepthStencilImageView))
+            {
+                DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image View for Depth Attachment.");
+                return false;
+            }
         }
 
         return true;
@@ -214,11 +198,28 @@ namespace Vulkan
 
     bool FrameBuffer::CreateVkFrameBuffer()
     {
-        // List of attachment (1:1 with Render Pass)
-        std::vector<VkImageView> attachments = { m_vkColorImageView };
-        if (m_vkDepthImageView)
+        // Using first the dimensions of first attachment for the frame buffer dimensions
+        if (!m_desc.m_colorAttachments.empty())
         {
-            attachments.push_back(m_vkDepthImageView);
+            const auto& colorDimensions = m_desc.m_colorAttachments.front().m_image->GetImageDesc().m_dimensions;
+            m_dimensions = Math::Vector2Int(colorDimensions.x, colorDimensions.y);
+        }
+        else if (m_desc.m_depthStencilAttachment.m_image)
+        {
+            const auto& depthStencilDimensions = m_desc.m_depthStencilAttachment.m_image->GetImageDesc().m_dimensions;
+            m_dimensions = Math::Vector2Int(depthStencilDimensions.x, depthStencilDimensions.y);
+        }
+        else
+        {
+            DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan FrameBuffer as there are no attachments.");
+            return false;
+        }
+
+        // List of attachment (1:1 with Render Pass)
+        std::vector<VkImageView> attachments = m_vkColorImageViews;
+        if (m_vkDepthStencilImageView)
+        {
+            attachments.push_back(m_vkDepthStencilImageView);
         }
 
         VkFramebufferCreateInfo vkFramebufferCreateInfo = {};
@@ -228,8 +229,8 @@ namespace Vulkan
         vkFramebufferCreateInfo.renderPass = m_vkRenderPass; // Render pass this FrameBuffer can be used with
         vkFramebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         vkFramebufferCreateInfo.pAttachments = attachments.data();
-        vkFramebufferCreateInfo.width = m_colorImage.m_size.x;
-        vkFramebufferCreateInfo.height = m_colorImage.m_size.y;
+        vkFramebufferCreateInfo.width = m_dimensions.x;
+        vkFramebufferCreateInfo.height = m_dimensions.y;
         vkFramebufferCreateInfo.layers = 1;
 
         if (vkCreateFramebuffer(
@@ -238,6 +239,10 @@ namespace Vulkan
             DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan FrameBuffer.");
             return false;
         }
+
+        DX_LOG(Info, "Vulkan FrameBuffer", "Frame buffer created. Color: %s (%d) DepthStencil: %s",
+            (!m_vkColorImageViews.empty()) ? "YES" : "NO", m_vkColorImageViews.size(),
+            (m_vkDepthStencilImageView) ? "YES" : "NO");
 
         return true;
     }

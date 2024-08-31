@@ -3,6 +3,8 @@
 #include <RHI/Device/Instance.h>
 #include <RHI/Device/Device.h>
 #include <RHI/FrameBuffer/FrameBuffer.h>
+#include <RHI/Resource/Image/Image.h>
+#include <RHI/Vulkan/Utils.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -214,7 +216,7 @@ namespace Vulkan
         m_vkSwapChain = nullptr;
     }
 
-    int SwapChain::GetImageFormat() const
+    ResourceFormat SwapChain::GetImageFormat() const
     {
         return m_imageFormat;
     }
@@ -307,7 +309,7 @@ namespace Vulkan
         }
 
         // Store recurrent swap chain properties
-        m_imageFormat = vkSurfaceFormat.format;
+        m_imageFormat = ToResourceFormat(vkSurfaceFormat.format);
         m_imageSize = Math::Vector2Int(vkImageExtent.width, vkImageExtent.height);
         vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &m_imageCount, nullptr);
 
@@ -326,36 +328,26 @@ namespace Vulkan
     {
         DX_LOG(Info, "Vulkan SwapChain", "Creating Vulkan FrameBuffers for SwapChain...");
 
-        // Obtain the images that have been created as part of the swap chain.
-        // The vulkan images are obtained from the swap chain.
-        std::vector<VkImage> vkSwapChainImages(m_imageCount);
-        vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &m_imageCount, vkSwapChainImages.data());
-
-        if (std::any_of(vkSwapChainImages.begin(), vkSwapChainImages.end(),
-            [](const VkImage& vkImage)
-            {
-                return vkImage == nullptr;
-            }))
+        std::vector<std::shared_ptr<Image>> swapChainImages = ObtainImagesFromSwapChain();
+        if (swapChainImages.empty())
         {
-            DX_LOG(Error, "Vulkan SwapChain", "Failed to populate Vulkan SwapChain Images.");
+            DX_LOG(Error, "Vulkan SwapChain", "Failed to obtain Vulkan SwapChain Images.");
             return false;
         }
 
         std::vector<std::unique_ptr<FrameBuffer>> frameBuffers;
-        frameBuffers.reserve(vkSwapChainImages.size());
+        frameBuffers.reserve(swapChainImages.size());
 
-        for (VkImage vkSwapChainImage : vkSwapChainImages)
+        for (auto& swapChainImage : swapChainImages)
         {
-            const Image colorImage = {
-                .m_vkImage = vkSwapChainImage,
-                .m_vkFormat = m_imageFormat,
-                .m_size = m_imageSize
+            FrameBufferDesc frameBufferDesc = {};
+            frameBufferDesc.m_colorAttachments = FrameBufferDesc::ImageAttachments{
+                {swapChainImage, swapChainImage->GetImageDesc().m_format}
             };
-            const bool createDepthAttachment = false;
+            frameBufferDesc.m_createDepthStencilAttachment = false;
 
-            auto frameBuffer = std::make_unique<FrameBuffer>(m_device, vkRenderPass, colorImage);
-
-            if (!frameBuffer->Initialize(createDepthAttachment))
+            auto frameBuffer = std::make_unique<FrameBuffer>(m_device, vkRenderPass, frameBufferDesc);
+            if (!frameBuffer->Initialize())
             {
                 DX_LOG(Error, "Vulkan SwapChain", "Failed to create FrameBuffer.");
                 return false;
@@ -374,5 +366,47 @@ namespace Vulkan
         DX_LOG(Info, "Vulkan SwapChain", "Destroying Vulkan FrameBuffers from SwapChain...");
 
         m_frameBuffers.clear();
+    }
+
+    std::vector<std::shared_ptr<Image>> SwapChain::ObtainImagesFromSwapChain()
+    {
+        // Obtain the images that have been created as part of the swap chain.
+        // The vulkan images are obtained from the swap chain.
+        std::vector<VkImage> vkSwapChainImages(m_imageCount);
+        vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &m_imageCount, vkSwapChainImages.data());
+
+        if (std::any_of(vkSwapChainImages.begin(), vkSwapChainImages.end(),
+            [](const VkImage& vkImage)
+            {
+                return vkImage == nullptr;
+            }))
+        {
+            return {};
+        }
+
+        std::vector<std::shared_ptr<Image>> swapChainImages;
+        swapChainImages.reserve(vkSwapChainImages.size());
+
+        for (auto& vkSwapChainImage : vkSwapChainImages)
+        {
+            ImageDesc imageDesc = {};
+            imageDesc.m_imageType = ImageType::Image2D;
+            imageDesc.m_dimensions = Math::Vector3Int(m_imageSize.x, m_imageSize.y, 0);
+            imageDesc.m_mipCount = 1;
+            imageDesc.m_format = m_imageFormat;
+            imageDesc.m_initialDataIsNativeResource = true;
+            imageDesc.m_initialData = vkSwapChainImage;
+            imageDesc.m_ownInitialNativeResource = false;
+
+            auto image = std::make_shared<Image>(m_device, imageDesc);
+            if (!image->Initialize())
+            {
+                return {};
+            }
+
+            swapChainImages.push_back(std::move(image));
+        }
+
+        return swapChainImages;
     }
 } // namespace Vulkan
