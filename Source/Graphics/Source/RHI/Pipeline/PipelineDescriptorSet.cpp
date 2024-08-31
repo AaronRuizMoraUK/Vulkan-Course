@@ -1,8 +1,8 @@
-#include <Renderer/Vulkan/PipelineDescriptorSet.h>
+#include <RHI/Pipeline/PipelineDescriptorSet.h>
 
-#include <Renderer/Vulkan/Device.h>
-#include <Renderer/Vulkan/Buffer.h>
-#include <Renderer/Vulkan/Pipeline.h>
+#include <RHI/Device/Device.h>
+#include <RHI/Resource/Buffer/Buffer.h>
+#include <RHI/Pipeline/Pipeline.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>

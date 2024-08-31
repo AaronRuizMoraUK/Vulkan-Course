@@ -1,7 +1,7 @@
-#include <Renderer/Vulkan/Device.h>
+#include <RHI/Device/Device.h>
 
-#include <Renderer/Vulkan/Instance.h>
-#include <Renderer/Vulkan/SwapChain.h>
+#include <RHI/Device/Instance.h>
+#include <RHI/SwapChain/SwapChain.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>

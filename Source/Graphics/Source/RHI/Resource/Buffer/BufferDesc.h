@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Renderer/Vulkan/BufferEnums.h>
+#include <RHI/Resource/Buffer/BufferEnums.h>
 
 namespace Vulkan
 {

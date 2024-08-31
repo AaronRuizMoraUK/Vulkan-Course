@@ -1,6 +1,6 @@
-#include <Renderer/Vulkan/FrameBuffer.h>
+#include <RHI/FrameBuffer/FrameBuffer.h>
 
-#include <Renderer/Vulkan/Device.h>
+#include <RHI/Device/Device.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>

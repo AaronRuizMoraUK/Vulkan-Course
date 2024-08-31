@@ -1,11 +1,11 @@
-#include <Renderer/Vulkan/CommandBuffer.h>
+#include <RHI/CommandBuffer/CommandBuffer.h>
 
-#include <Renderer/Vulkan/Device.h>
-#include <Renderer/Vulkan/FrameBuffer.h>
-#include <Renderer/Vulkan/Pipeline.h>
-#include <Renderer/Vulkan/PipelineDescriptorSet.h>
-#include <Renderer/Vulkan/Buffer.h>
-#include <Renderer/Vulkan/Utils.h>
+#include <RHI/Device/Device.h>
+#include <RHI/FrameBuffer/FrameBuffer.h>
+#include <RHI/Pipeline/Pipeline.h>
+#include <RHI/Pipeline/PipelineDescriptorSet.h>
+#include <RHI/Resource/Buffer/Buffer.h>
+#include <RHI/Vulkan/Utils.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>

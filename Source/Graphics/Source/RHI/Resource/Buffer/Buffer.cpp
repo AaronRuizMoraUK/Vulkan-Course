@@ -1,8 +1,8 @@
-#include <Renderer/Vulkan/Buffer.h>
+#include <RHI/Resource/Buffer/Buffer.h>
 
-#include <Renderer/Vulkan/Device.h>
-#include <Renderer/Vulkan/CommandBuffer.h>
-#include <Renderer/Vulkan/Utils.h>
+#include <RHI/Device/Device.h>
+#include <RHI/CommandBuffer/CommandBuffer.h>
+#include <RHI/Vulkan/Utils.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>

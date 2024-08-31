@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Renderer/Vulkan/Image.h>
+#include <RHI/Resource/Image/Image.h>
 
 typedef struct VkFramebuffer_T* VkFramebuffer;
 typedef struct VkRenderPass_T* VkRenderPass;

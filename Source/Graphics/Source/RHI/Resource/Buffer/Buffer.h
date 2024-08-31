@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Renderer/Vulkan/BufferDesc.h>
+#include <RHI/Resource/Buffer/BufferDesc.h>
 
 typedef struct VkBuffer_T* VkBuffer;
 typedef struct VkDeviceMemory_T* VkDeviceMemory;

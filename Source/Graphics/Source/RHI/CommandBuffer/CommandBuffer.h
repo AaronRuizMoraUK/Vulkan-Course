@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Renderer/Vulkan/CommandBufferEnums.h>
-#include <Renderer/Vulkan/ShaderEnums.h>
+#include <RHI/CommandBuffer/CommandBufferEnums.h>
+#include <RHI/Shader/ShaderEnums.h>
 
 #include <Math/Color.h>
 

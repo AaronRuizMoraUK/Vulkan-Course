@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Renderer/Vulkan/BufferEnums.h>
-#include <Renderer/Vulkan/CommandBufferEnums.h>
-#include <Renderer/Vulkan/ShaderEnums.h>
+#include <RHI/Resource/Buffer/BufferEnums.h>
+#include <RHI/CommandBuffer/CommandBufferEnums.h>
+#include <RHI/Shader/ShaderEnums.h>
 
 #include <vulkan/vulkan.h>
 

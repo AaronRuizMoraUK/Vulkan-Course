@@ -1,8 +1,8 @@
-#include <Renderer/Vulkan/SwapChain.h>
+#include <RHI/SwapChain/SwapChain.h>
 
-#include <Renderer/Vulkan/Instance.h>
-#include <Renderer/Vulkan/Device.h>
-#include <Renderer/Vulkan/FrameBuffer.h>
+#include <RHI/Device/Instance.h>
+#include <RHI/Device/Device.h>
+#include <RHI/FrameBuffer/FrameBuffer.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>

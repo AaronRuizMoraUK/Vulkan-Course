@@ -1,13 +1,13 @@
 #include <Renderer/Renderer.h>
 
 #include <Renderer/Object.h>
-#include <Renderer/Vulkan/Instance.h>
-#include <Renderer/Vulkan/Device.h>
-#include <Renderer/Vulkan/SwapChain.h>
-#include <Renderer/Vulkan/Pipeline.h>
-#include <Renderer/Vulkan/CommandBuffer.h>
-#include <Renderer/Vulkan/Buffer.h>
-#include <Renderer/Vulkan/PipelineDescriptorSet.h>
+#include <RHI/Device/Instance.h>
+#include <RHI/Device/Device.h>
+#include <RHI/SwapChain/SwapChain.h>
+#include <RHI/Pipeline/Pipeline.h>
+#include <RHI/Pipeline/PipelineDescriptorSet.h>
+#include <RHI/CommandBuffer/CommandBuffer.h>
+#include <RHI/Resource/Buffer/Buffer.h>
 
 #include <Camera/Camera.h>
 

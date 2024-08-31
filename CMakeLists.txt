@@ -40,6 +40,7 @@ include("${CMAKE_SOURCE_DIR}/Scripts/FetchLibraries.cmake")
 # Engine libraries
 
 add_subdirectory(Source/Core)
+add_subdirectory(Source/Graphics)
 add_subdirectory(Source/Runtime)
 
 # ----------------------------------------------------
