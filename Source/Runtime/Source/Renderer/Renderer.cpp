@@ -280,7 +280,8 @@ namespace DX
         if (commandBuffer->Begin())
         {
             commandBuffer->BeginRenderPass(frameBuffer,
-                Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f));
+                Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f),
+                1.0f);
 
             commandBuffer->BindPipeline(m_pipeline.get());
 
@@ -362,7 +363,8 @@ namespace DX
             Math::Vector2(0.0f, 0.0f),
             Math::Vector2(m_swapChain->GetImageSize()));
 
-        m_pipeline = std::make_unique<Vulkan::Pipeline>(m_device.get(), m_swapChain->GetImageFormat(), viewport);
+        m_pipeline = std::make_unique<Vulkan::Pipeline>(m_device.get(), viewport, 
+            m_swapChain->GetImageFormat(), Vulkan::ResourceFormat::D24_UNORM_S8_UINT);
 
         if (!m_pipeline->Initialize())
         {

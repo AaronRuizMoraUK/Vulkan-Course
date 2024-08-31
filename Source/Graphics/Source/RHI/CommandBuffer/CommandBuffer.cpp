@@ -94,6 +94,7 @@ namespace Vulkan
         std::optional<float> clearDepth,
         std::optional<uint8_t> clearStencil)
     {
+        // TODO: Build clearValues by asking the frame buffer how many color and depth attachments it has.
         // Clear values needs to match 1:1 with attachments in frame buffer
         std::vector<VkClearValue> clearValues;
         if (clearColor.has_value())

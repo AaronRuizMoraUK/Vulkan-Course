@@ -28,7 +28,8 @@ namespace Vulkan
     class Pipeline
     {
     public:
-        Pipeline(Device* device, ResourceFormat imageFormat, const Math::Rectangle& viewport);
+        Pipeline(Device* device, const Math::Rectangle& viewport,
+            ResourceFormat colorFormat, ResourceFormat depthStencilFormat);
         ~Pipeline();
 
         Pipeline(const Pipeline&) = delete;
@@ -54,8 +55,11 @@ namespace Vulkan
 
     private:
         Device* m_device = nullptr;
-        ResourceFormat m_imageFormat = ResourceFormat::Unknown;
         Math::Rectangle m_viewport;
+
+        // TODO: Remove formats when render pass is moved to its own class
+        ResourceFormat m_colorFormat = ResourceFormat::Unknown;
+        ResourceFormat m_depthStencilFormat = ResourceFormat::Unknown;
 
     private:
         bool CreateVkRenderPass();

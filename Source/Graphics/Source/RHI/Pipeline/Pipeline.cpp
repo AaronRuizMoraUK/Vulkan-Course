@@ -58,10 +58,12 @@ namespace Vulkan
         }
     } // namespace Utils
 
-    Pipeline::Pipeline(Device* device, ResourceFormat imageFormat, const Math::Rectangle& viewport)
+    Pipeline::Pipeline(Device* device, const Math::Rectangle& viewport,
+        ResourceFormat colorFormat, ResourceFormat depthStencilFormat)
         : m_device(device)
-        , m_imageFormat(imageFormat)
         , m_viewport(viewport)
+        , m_colorFormat(colorFormat)
+        , m_depthStencilFormat(depthStencilFormat)
     {
     }
 
@@ -174,19 +176,36 @@ namespace Vulkan
         // In our responsibility to specify the correct image layouts for the images while they
         // are being used by render passes and subpasses.
 
-        // Color attachment of the render pass
-        const VkAttachmentDescription colorAttachment = {
-            .flags = 0,
-            .format = ToVkFormat(m_imageFormat), // Format to use for attachment
-            .samples = VK_SAMPLE_COUNT_1_BIT, // Number of samples to write for MSAA
+        // Attachments of the render pass
+        const std::vector<VkAttachmentDescription> attachments = {
+            // 0) Color Attachment
+            {
+                .flags = 0,
+                .format = ToVkFormat(m_colorFormat), // Format to use for attachment
+                .samples = VK_SAMPLE_COUNT_1_BIT, // Number of samples to write for MSAA
 
-            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // What to do with attachment before rendering
-            .storeOp = VK_ATTACHMENT_STORE_OP_STORE, // What to do with attachment after rendering
-            .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // What to do with attachment before rendering
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE, // What to do with attachment after rendering
+                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 
-            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED, // Image data layout expected before render pass starts
-            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // Image data layout to convert to after render pass finishes
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED, // Image data layout expected before render pass starts
+                .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // Image data layout to convert to after render pass finishes
+            },
+            // 1) Depth/Stencil Attachment
+            {
+                .flags = 0,
+                .format = ToVkFormat(m_depthStencilFormat),
+                .samples = VK_SAMPLE_COUNT_1_BIT,
+
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+            }
         };
 
         // Render subpass
@@ -194,9 +213,18 @@ namespace Vulkan
         // A subpass has references to Render Pass's attachment descriptors (vkRenderPassCreateInfo.pAttachments),
         // not the attachment descriptors themselves. The reference is specify with an Attachment Reference, where
         // indices to vkRenderPassCreateInfo.pAttachments are specified.
-        const VkAttachmentReference colorAttachmentReference = {
-            .attachment = 0, // Index of the attachment inside vkRenderPassCreateInfo.pAttachments
-            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL  // Image data layout to convert to before render subpass starts
+        //
+        // NOTE: A subpass doesn't have to use all attachments defined in the render pass.
+        //       The render pass defines them all, the subpasses indicates which ones are used.
+        const std::vector<VkAttachmentReference> colorAttachmentReferences = {
+            {
+                .attachment = 0, // Index of the attachment inside vkRenderPassCreateInfo.pAttachments
+                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL  // Image data layout to convert to before render subpass starts
+            }
+        };
+        const VkAttachmentReference depthStencilAttachmentReference = {
+            .attachment = 1,
+            .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         };
 
         const VkSubpassDescription subpass = {
@@ -204,10 +232,10 @@ namespace Vulkan
             .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS, // What pipeline the subpass is to be bound to
             .inputAttachmentCount = 0,
             .pInputAttachments = nullptr,
-            .colorAttachmentCount = 1,
-            .pColorAttachments = &colorAttachmentReference,
+            .colorAttachmentCount = static_cast<uint32_t>(colorAttachmentReferences.size()),
+            .pColorAttachments = colorAttachmentReferences.data(),
             .pResolveAttachments = 0,
-            .pDepthStencilAttachment = nullptr,
+            .pDepthStencilAttachment = &depthStencilAttachmentReference,
             .preserveAttachmentCount = 0,
             .pPreserveAttachments = nullptr
         };
@@ -286,8 +314,8 @@ namespace Vulkan
         vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         vkRenderPassCreateInfo.pNext = nullptr;
         vkRenderPassCreateInfo.flags = 0;
-        vkRenderPassCreateInfo.attachmentCount = 1;
-        vkRenderPassCreateInfo.pAttachments = &colorAttachment;
+        vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+        vkRenderPassCreateInfo.pAttachments = attachments.data();
         vkRenderPassCreateInfo.subpassCount = 1;
         vkRenderPassCreateInfo.pSubpasses = &subpass;
         vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(subpassDependencies.size());
@@ -607,7 +635,20 @@ namespace Vulkan
             vkPipelineColorBlendStateCreateInfo.blendConstants[2] = 0.0f;
             vkPipelineColorBlendStateCreateInfo.blendConstants[3] = 0.0f;
 
-            // TODO: Pipeline Depth Stencil State
+            // Pipeline Depth Stencil State
+            VkPipelineDepthStencilStateCreateInfo vkPipelineDepthStencilStateCreateInfo = {};
+            vkPipelineDepthStencilStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            vkPipelineDepthStencilStateCreateInfo.pNext = nullptr;
+            vkPipelineDepthStencilStateCreateInfo.flags = 0;
+            vkPipelineDepthStencilStateCreateInfo.depthTestEnable = VK_TRUE;
+            vkPipelineDepthStencilStateCreateInfo.depthWriteEnable = VK_TRUE;
+            vkPipelineDepthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+            vkPipelineDepthStencilStateCreateInfo.depthBoundsTestEnable = VK_FALSE; // When true, to pass the depth test the depth value must be between minDepthBounds and maxDepthBounds
+            vkPipelineDepthStencilStateCreateInfo.minDepthBounds = 0.0f;
+            vkPipelineDepthStencilStateCreateInfo.maxDepthBounds = 0.0f;
+            vkPipelineDepthStencilStateCreateInfo.stencilTestEnable = VK_FALSE;
+            //vkPipelineDepthStencilStateCreateInfo.front;
+            //vkPipelineDepthStencilStateCreateInfo.back;
 
             // Finally, create the graphics pipeline
             VkGraphicsPipelineCreateInfo vkGraphicsPipelineCreateInfo;
@@ -622,7 +663,7 @@ namespace Vulkan
             vkGraphicsPipelineCreateInfo.pViewportState = &vkPipelineViewportStateCreateInfo;
             vkGraphicsPipelineCreateInfo.pRasterizationState = &vkPipelineRasterizationStateCreateInfo;
             vkGraphicsPipelineCreateInfo.pMultisampleState = &vkPipelineMultisampleStateCreateInfo;
-            vkGraphicsPipelineCreateInfo.pDepthStencilState = nullptr;
+            vkGraphicsPipelineCreateInfo.pDepthStencilState = &vkPipelineDepthStencilStateCreateInfo;
             vkGraphicsPipelineCreateInfo.pColorBlendState = &vkPipelineColorBlendStateCreateInfo;
             vkGraphicsPipelineCreateInfo.pDynamicState = nullptr;
             vkGraphicsPipelineCreateInfo.layout = m_vkPipelineLayout;

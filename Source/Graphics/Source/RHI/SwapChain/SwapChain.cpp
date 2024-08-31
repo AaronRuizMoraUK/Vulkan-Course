@@ -340,11 +340,17 @@ namespace Vulkan
 
         for (auto& swapChainImage : swapChainImages)
         {
+            // TODO: Make SwapChain own the depth image (created at CreateVkSwapChain) and store its format.
+            //       This will lead to 2 improvements:
+            //       - Use the same depth image for all frame buffers as the depth is only used during pipeline
+            //         execution and the commands of 2 frames are executed at the same time.
+            //       - When RenderPass is created now we can pass the depth format.
+
             FrameBufferDesc frameBufferDesc = {};
             frameBufferDesc.m_colorAttachments = FrameBufferDesc::ImageAttachments{
                 {swapChainImage, swapChainImage->GetImageDesc().m_format}
             };
-            frameBufferDesc.m_createDepthStencilAttachment = false;
+            frameBufferDesc.m_createDepthStencilAttachment = true;
 
             auto frameBuffer = std::make_unique<FrameBuffer>(m_device, vkRenderPass, frameBufferDesc);
             if (!frameBuffer->Initialize())
@@ -391,7 +397,7 @@ namespace Vulkan
         {
             ImageDesc imageDesc = {};
             imageDesc.m_imageType = ImageType::Image2D;
-            imageDesc.m_dimensions = Math::Vector3Int(m_imageSize.x, m_imageSize.y, 0);
+            imageDesc.m_dimensions = Math::Vector3Int(m_imageSize.x, m_imageSize.y, 1);
             imageDesc.m_mipCount = 1;
             imageDesc.m_format = m_imageFormat;
             imageDesc.m_tiling = ImageTiling::Optimal;

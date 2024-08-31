@@ -37,7 +37,7 @@ namespace Vulkan
                 vkImageCreateInfo.format = vkFormat;
                 vkImageCreateInfo.extent.width = dimensions.x;
                 vkImageCreateInfo.extent.height = dimensions.y;
-                vkImageCreateInfo.extent.depth = dimensions.z;
+                vkImageCreateInfo.extent.depth = dimensions.z; // Must be greater than 0
                 vkImageCreateInfo.mipLevels = mipCount;
                 vkImageCreateInfo.arrayLayers = 1;
                 vkImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multi-sampling
@@ -66,7 +66,7 @@ namespace Vulkan
 
             // Allocate memory for image and link them together
             {
-                // Get Buffer's Memory Requirements
+                // Get Image's Memory Requirements
                 VkMemoryRequirements vkMemoryRequirements = {};
                 vkGetImageMemoryRequirements(device->GetVkDevice(), *vkImageOut, &vkMemoryRequirements);
 
@@ -80,7 +80,7 @@ namespace Vulkan
 
                 if (vkAllocateMemory(device->GetVkDevice(), &vkMemoryAllocateInfo, nullptr, vkImageMemoryOut) != VK_SUCCESS)
                 {
-                    DX_LOG(Error, "Vulkan Image", "Failed to allocate memory for Vulkan Buffer.");
+                    DX_LOG(Error, "Vulkan Image", "Failed to allocate memory for Vulkan Image.");
                     return false;
                 }
 
@@ -202,7 +202,7 @@ namespace Vulkan
             return true;
         }
 
-        const VkImageUsageFlags vkImageUsageFlags = ToVkBufferUsageFlags(m_desc.m_usageFlags);
+        const VkImageUsageFlags vkImageUsageFlags = ToVkImageUsageFlags(m_desc.m_usageFlags);
 
         const VkMemoryPropertyFlags vkMemoryProperties = [this]() -> int
             {

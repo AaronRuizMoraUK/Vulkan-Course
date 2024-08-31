@@ -196,17 +196,21 @@ namespace Vulkan
             {
                 const ImageDesc& imageDesc = m_desc.m_colorAttachments.front().m_image->GetImageDesc();
 
-                const ResourceFormat depthStencilFormat = Utils::ChooseSupportedFormat(m_device,
-                    { ResourceFormat::D32_SFLOAT_S8_UINT, ResourceFormat::D24_UNORM_S8_UINT },
-                    ImageTiling::Optimal,
-                    VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-                );
+                // Since format set in Render Pass must match, it's not possible to choose between
+                // different ones. If the FrameBuffer needs to create the depth image, then a preselected
+                // one needs to be used (such as ResourceFormat::D24_UNORM_S8_UINT).
+
+                //const ResourceFormat depthStencilFormat = Utils::ChooseSupportedFormat(m_device,
+                //    { ResourceFormat::D32_SFLOAT_S8_UINT, ResourceFormat::D24_UNORM_S8_UINT },
+                //    ImageTiling::Optimal,
+                //    VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+                //);
 
                 ImageDesc depthStencilImageDesc = {};
                 depthStencilImageDesc.m_imageType = ImageType::Image2D;
                 depthStencilImageDesc.m_dimensions = imageDesc.m_dimensions;
                 depthStencilImageDesc.m_mipCount = imageDesc.m_mipCount;
-                depthStencilImageDesc.m_format = depthStencilFormat;
+                depthStencilImageDesc.m_format = ResourceFormat::D24_UNORM_S8_UINT; // Must match the DepthStencil attachment format set in Render Pass
                 depthStencilImageDesc.m_tiling = ImageTiling::Optimal;
                 depthStencilImageDesc.m_usageFlags = ImageUsage_DepthStencilAttachment;
                 depthStencilImageDesc.m_memoryProperty = ResourceMemoryProperty::DeviceLocal;
@@ -256,7 +260,7 @@ namespace Vulkan
             return false;
         }
 
-        // List of attachment (1:1 with Render Pass)
+        // List of attachment (must match 1:1 with Render Pass attachments)
         std::vector<VkImageView> attachments = m_vkColorImageViews;
         if (m_vkDepthStencilImageView)
         {
