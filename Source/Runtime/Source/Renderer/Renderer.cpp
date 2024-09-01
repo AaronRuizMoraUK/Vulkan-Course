@@ -350,10 +350,6 @@ namespace DX
             return false;
         }
 
-        DX_ASSERT(Vulkan::MaxFrameDraws < m_swapChain->GetImageCount(), "Renderer",
-            "MaxFrameDraws (%d) is greater or equal than swap chain's images (%d).",
-            Vulkan::MaxFrameDraws, m_swapChain->GetImageCount());
-
         return true;
     }
 
@@ -364,7 +360,7 @@ namespace DX
             Math::Vector2(m_swapChain->GetImageSize()));
 
         m_pipeline = std::make_unique<Vulkan::Pipeline>(m_device.get(), viewport, 
-            m_swapChain->GetImageFormat(), Vulkan::ResourceFormat::D24_UNORM_S8_UINT);
+            m_swapChain->GetImageFormat(), m_swapChain->GetDepthStencilFormat());
 
         if (!m_pipeline->Initialize())
         {

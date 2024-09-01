@@ -35,6 +35,36 @@ namespace Vulkan
         return std::numeric_limits<uint32_t>::max();
     }
 
+    ResourceFormat ChooseSupportedFormat(
+        VkPhysicalDevice vkPhysicalDevice,
+        const std::vector<ResourceFormat>& formats,
+        ImageTiling imageTiling,
+        VkFormatFeatureFlags vkFormatFeatureFlags)
+    {
+        // Loop through the formats provided and find a compatible one
+        for (ResourceFormat format : formats)
+        {
+            // Get properties of the format on this device
+            VkFormatProperties vkFormatProperties = {};
+            vkGetPhysicalDeviceFormatProperties(vkPhysicalDevice, ToVkFormat(format), &vkFormatProperties);
+
+            // Does the format support all features we requested for optimal tiling?
+            if (imageTiling == ImageTiling::Optimal &&
+                (vkFormatProperties.optimalTilingFeatures & vkFormatFeatureFlags) == vkFormatFeatureFlags)
+            {
+                return format;
+            }
+            // Does the format support all features we requested for lineal tiling?
+            else if (imageTiling == ImageTiling::Linear &&
+                (vkFormatProperties.linearTilingFeatures & vkFormatFeatureFlags) == vkFormatFeatureFlags)
+            {
+                return format;
+            }
+        }
+
+        return ResourceFormat::Unknown;
+    }
+
     VkFormat ToVkFormat(ResourceFormat format)
     {
         switch (format)

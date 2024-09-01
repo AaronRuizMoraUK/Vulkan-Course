@@ -21,10 +21,5 @@ namespace Vulkan
 
         ImageAttachments m_colorAttachments;
         ImageAttachment m_depthStencilAttachment;
-
-        // When true, the 2D depth stencil attachment will be created.
-        // It'll have the same dimensions as the first color attachment
-        // and format D24_UNORM_S8_UINT.
-        bool m_createDepthStencilAttachment;
     };
 } // namespace Vulkan

@@ -39,6 +39,8 @@ namespace Vulkan
         ResourceFormat GetImageFormat() const;
         const Math::Vector2Int& GetImageSize() const;
 
+        ResourceFormat GetDepthStencilFormat() const;
+
         uint32_t GetImageCount() const;
         FrameBuffer* GetFrameBuffer(uint32_t imageIndex);
 
@@ -56,6 +58,8 @@ namespace Vulkan
         uint32_t m_imageCount = 0;
         ResourceFormat m_imageFormat = ResourceFormat::Unknown;
         Math::Vector2Int m_imageSize = Math::Vector2Int(0);
+
+        ResourceFormat m_depthStencilFormat = ResourceFormat::Unknown;
 
         // Frame buffers for drawing into each swap chain image.
         std::vector<std::unique_ptr<FrameBuffer>> m_frameBuffers;

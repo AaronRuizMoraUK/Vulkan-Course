@@ -8,10 +8,15 @@
 
 #include <vulkan/vulkan.h>
 
+#include <vector>
+
 namespace Vulkan
 {
     uint32_t FindCompatibleMemoryTypeIndex(
         VkPhysicalDevice vkPhysicalDevice, uint32_t allowedMemoryTypes, VkMemoryPropertyFlags properties);
+
+    ResourceFormat ChooseSupportedFormat(VkPhysicalDevice vkPhysicalDevice,
+        const std::vector<ResourceFormat>& formats, ImageTiling imageTiling, VkFormatFeatureFlags vkFormatFeatureFlags);
 
     VkFormat ToVkFormat(ResourceFormat format);
 

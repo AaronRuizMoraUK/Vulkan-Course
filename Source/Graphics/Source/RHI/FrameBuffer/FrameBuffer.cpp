@@ -55,36 +55,6 @@ namespace Vulkan
             vkDestroyImageView(device->GetVkDevice(), vkImageView, nullptr);
             vkImageView = nullptr;
         }
-
-        ResourceFormat ChooseSupportedFormat(
-            Device* device,
-            const std::vector<ResourceFormat>& formats,
-            ImageTiling imageTiling,
-            VkFormatFeatureFlags vkFormatFeatureFlags)
-        {
-            // Loop through the formats provided and find a compatible one
-            for (ResourceFormat format : formats)
-            {
-                // Get properties of the format on this device
-                VkFormatProperties vkFormatProperties = {};
-                vkGetPhysicalDeviceFormatProperties(device->GetVkPhysicalDevice(), ToVkFormat(format), &vkFormatProperties);
-
-                // Does the format support all features we requested for optimal tiling?
-                if (imageTiling == ImageTiling::Optimal &&
-                    (vkFormatProperties.optimalTilingFeatures & vkFormatFeatureFlags) == vkFormatFeatureFlags)
-                {
-                    return format;
-                }
-                // Does the format support all features we requested for lineal tiling?
-                else if (imageTiling == ImageTiling::Linear &&
-                    (vkFormatProperties.linearTilingFeatures & vkFormatFeatureFlags) == vkFormatFeatureFlags)
-                {
-                    return format;
-                }
-            }
-
-            return ResourceFormat::Unknown;
-        }
     } // namespace Utils
 
     FrameBuffer::FrameBuffer(Device* device, VkRenderPass vkRenderPass, const FrameBufferDesc& desc)
@@ -189,42 +159,6 @@ namespace Vulkan
 
     bool FrameBuffer::CreateDepthStencilAttachment()
     {
-        if (!m_desc.m_depthStencilAttachment.m_image &&
-            m_desc.m_createDepthStencilAttachment)
-        {
-            if (!m_desc.m_colorAttachments.empty())
-            {
-                const ImageDesc& imageDesc = m_desc.m_colorAttachments.front().m_image->GetImageDesc();
-
-                // Since format set in Render Pass must match, it's not possible to choose between
-                // different ones. If the FrameBuffer needs to create the depth image, then a preselected
-                // one needs to be used (such as ResourceFormat::D24_UNORM_S8_UINT).
-
-                //const ResourceFormat depthStencilFormat = Utils::ChooseSupportedFormat(m_device,
-                //    { ResourceFormat::D32_SFLOAT_S8_UINT, ResourceFormat::D24_UNORM_S8_UINT },
-                //    ImageTiling::Optimal,
-                //    VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-                //);
-
-                ImageDesc depthStencilImageDesc = {};
-                depthStencilImageDesc.m_imageType = ImageType::Image2D;
-                depthStencilImageDesc.m_dimensions = imageDesc.m_dimensions;
-                depthStencilImageDesc.m_mipCount = imageDesc.m_mipCount;
-                depthStencilImageDesc.m_format = ResourceFormat::D24_UNORM_S8_UINT; // Must match the DepthStencil attachment format set in Render Pass
-                depthStencilImageDesc.m_tiling = ImageTiling::Optimal;
-                depthStencilImageDesc.m_usageFlags = ImageUsage_DepthStencilAttachment;
-                depthStencilImageDesc.m_memoryProperty = ResourceMemoryProperty::DeviceLocal;
-
-                m_desc.m_depthStencilAttachment.m_image = std::make_shared<Image>(m_device, depthStencilImageDesc);
-                if (!m_desc.m_depthStencilAttachment.m_image->Initialize())
-                {
-                    DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan Image for Depth Attachment.");
-                    return false;
-                }
-                m_desc.m_depthStencilAttachment.m_viewFormat = depthStencilImageDesc.m_format;
-            }
-        }
-
         if (m_desc.m_depthStencilAttachment.m_image)
         {
             if (!Utils::CreateVkImageView(m_device,
@@ -244,20 +178,22 @@ namespace Vulkan
     bool FrameBuffer::CreateVkFrameBuffer()
     {
         // Using first the dimensions of first attachment for the frame buffer dimensions
-        if (!m_desc.m_colorAttachments.empty())
         {
-            const auto& colorDimensions = m_desc.m_colorAttachments.front().m_image->GetImageDesc().m_dimensions;
-            m_dimensions = Math::Vector2Int(colorDimensions.x, colorDimensions.y);
-        }
-        else if (m_desc.m_depthStencilAttachment.m_image)
-        {
-            const auto& depthStencilDimensions = m_desc.m_depthStencilAttachment.m_image->GetImageDesc().m_dimensions;
-            m_dimensions = Math::Vector2Int(depthStencilDimensions.x, depthStencilDimensions.y);
-        }
-        else
-        {
-            DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan FrameBuffer as there are no attachments.");
-            return false;
+            if (!m_desc.m_colorAttachments.empty())
+            {
+                const auto& colorDimensions = m_desc.m_colorAttachments.front().m_image->GetImageDesc().m_dimensions;
+                m_dimensions = Math::Vector2Int(colorDimensions.x, colorDimensions.y);
+            }
+            else if (m_desc.m_depthStencilAttachment.m_image)
+            {
+                const auto& depthStencilDimensions = m_desc.m_depthStencilAttachment.m_image->GetImageDesc().m_dimensions;
+                m_dimensions = Math::Vector2Int(depthStencilDimensions.x, depthStencilDimensions.y);
+            }
+            else
+            {
+                DX_LOG(Error, "Vulkan FrameBuffer", "Failed to create Vulkan FrameBuffer as there are no attachments.");
+                return false;
+            }
         }
 
         // List of attachment (must match 1:1 with Render Pass attachments)

@@ -203,6 +203,10 @@ namespace Vulkan
             return false;
         }
 
+        DX_ASSERT(MaxFrameDraws < m_imageCount, "Vulkan SwapChain",
+            "MaxFrameDraws (%d) is greater or equal than swap chain's images (%d).",
+            MaxFrameDraws, m_imageCount);
+
         return true;
     }
 
@@ -224,6 +228,11 @@ namespace Vulkan
     const Math::Vector2Int& SwapChain::GetImageSize() const
     {
         return m_imageSize;
+    }
+
+    ResourceFormat SwapChain::GetDepthStencilFormat() const
+    {
+        return m_depthStencilFormat;
     }
 
     uint32_t SwapChain::GetImageCount() const
@@ -313,11 +322,18 @@ namespace Vulkan
         m_imageSize = Math::Vector2Int(vkImageExtent.width, vkImageExtent.height);
         vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &m_imageCount, nullptr);
 
+        m_depthStencilFormat = ChooseSupportedFormat(m_device->GetVkPhysicalDevice(),
+            { ResourceFormat::D32_SFLOAT_S8_UINT, ResourceFormat::D24_UNORM_S8_UINT },
+            ImageTiling::Optimal,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
+
         DX_LOG(Verbose, "Vulkan SwapChain", "SwapChain Properties:");
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Size: %dx%d", m_imageSize.x, m_imageSize.y);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Count: %d", m_imageCount);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Format: %d", m_imageFormat);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Color Space: %d", vkSurfaceFormat.colorSpace);
+        DX_LOG(Verbose, "Vulkan SwapChain", "\t- DepthStencil Format: %d", m_depthStencilFormat);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Present Mode: %d", vkPresentMode);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Unique Queue Family Indices: %d", uniqueFamilyIndices.size());
 
@@ -335,22 +351,42 @@ namespace Vulkan
             return false;
         }
 
+        // Create DepthStencil Image
+        std::shared_ptr<Image> depthStencilImage;
+        {
+            ImageDesc depthStencilImageDesc = {};
+            depthStencilImageDesc.m_imageType = ImageType::Image2D;
+            depthStencilImageDesc.m_dimensions = Math::Vector3Int(m_imageSize.x, m_imageSize.y, 1);
+            depthStencilImageDesc.m_mipCount = 1;
+            depthStencilImageDesc.m_format = m_depthStencilFormat;
+            depthStencilImageDesc.m_tiling = ImageTiling::Optimal;
+            depthStencilImageDesc.m_usageFlags = ImageUsage_DepthStencilAttachment;
+            depthStencilImageDesc.m_memoryProperty = ResourceMemoryProperty::DeviceLocal;
+
+            depthStencilImage = std::make_shared<Image>(m_device, depthStencilImageDesc);
+            if (!depthStencilImage->Initialize())
+            {
+                DX_LOG(Error, "Vulkan SwapChain", "Failed to create Vulkan Image for Depth Attachment.");
+                return false;
+            }
+        }
+
         std::vector<std::unique_ptr<FrameBuffer>> frameBuffers;
         frameBuffers.reserve(swapChainImages.size());
 
         for (auto& swapChainImage : swapChainImages)
         {
-            // TODO: Make SwapChain own the depth image (created at CreateVkSwapChain) and store its format.
-            //       This will lead to 2 improvements:
-            //       - Use the same depth image for all frame buffers as the depth is only used during pipeline
-            //         execution and the commands of 2 frames are executed at the same time.
-            //       - When RenderPass is created now we can pass the depth format.
-
             FrameBufferDesc frameBufferDesc = {};
             frameBufferDesc.m_colorAttachments = FrameBufferDesc::ImageAttachments{
-                {swapChainImage, swapChainImage->GetImageDesc().m_format}
+                {
+                    swapChainImage,
+                    swapChainImage->GetImageDesc().m_format
+                }
             };
-            frameBufferDesc.m_createDepthStencilAttachment = true;
+            frameBufferDesc.m_depthStencilAttachment = {
+                depthStencilImage,
+                depthStencilImage->GetImageDesc().m_format
+            };
 
             auto frameBuffer = std::make_unique<FrameBuffer>(m_device, vkRenderPass, frameBufferDesc);
             if (!frameBuffer->Initialize())
