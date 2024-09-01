@@ -1,6 +1,7 @@
 #include <RHI/FrameBuffer/FrameBuffer.h>
 
 #include <RHI/Device/Device.h>
+#include <RHI/RenderPass/RenderPass.h>
 #include <RHI/Resource/Image/Image.h>
 #include <RHI/Vulkan/Utils.h>
 
@@ -57,9 +58,8 @@ namespace Vulkan
         }
     } // namespace Utils
 
-    FrameBuffer::FrameBuffer(Device* device, VkRenderPass vkRenderPass, const FrameBufferDesc& desc)
+    FrameBuffer::FrameBuffer(Device* device, const FrameBufferDesc& desc)
         : m_device(device)
-        , m_vkRenderPass(vkRenderPass)
         , m_desc(desc)
     {
     }
@@ -119,14 +119,14 @@ namespace Vulkan
         // gets out of scope and the shared_ptr counter gets to zero
     }
 
+    const FrameBufferDesc& FrameBuffer::GetFrameBufferDesc() const
+    {
+        return m_desc;
+    }
+
     const Math::Vector2Int& FrameBuffer::GetDimensions() const
     {
         return m_dimensions;
-    }
-
-    VkRenderPass FrameBuffer::GetVkRenderPass()
-    {
-        return m_vkRenderPass;
     }
 
     VkFramebuffer FrameBuffer::GetVkFrameBuffer()
@@ -207,7 +207,7 @@ namespace Vulkan
         vkFramebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         vkFramebufferCreateInfo.pNext = nullptr;
         vkFramebufferCreateInfo.flags = 0;
-        vkFramebufferCreateInfo.renderPass = m_vkRenderPass; // Render pass this FrameBuffer can be used with
+        vkFramebufferCreateInfo.renderPass = m_desc.m_renderPass->GetVkRenderPass(); // Render pass this FrameBuffer can be used with
         vkFramebufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         vkFramebufferCreateInfo.pAttachments = attachments.data();
         vkFramebufferCreateInfo.width = m_dimensions.x;

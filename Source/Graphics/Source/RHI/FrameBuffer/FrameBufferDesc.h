@@ -7,10 +7,13 @@
 
 namespace Vulkan
 {
+    class RenderPass;
     class Image;
 
     struct FrameBufferDesc
     {
+        RenderPass* m_renderPass = nullptr;
+
         struct ImageAttachment
         {
             std::shared_ptr<Image> m_image;

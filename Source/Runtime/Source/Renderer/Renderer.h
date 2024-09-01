@@ -17,11 +17,12 @@ namespace Vulkan
     class Instance;
     class Device;
     class SwapChain;
+    class RenderPass;
+    class FrameBuffer;
     class Pipeline;
     class Buffer;
     class PipelineDescriptorSet;
     class CommandBuffer;
-    class FrameBuffer;
 }
 
 namespace DX
@@ -116,9 +117,11 @@ namespace DX
         std::unique_ptr<Vulkan::SwapChain> m_swapChain;
 
     private:
-        bool CreatePipeline();
+        bool CreateRenderPass();
         bool CreateFrameBuffers();
+        bool CreatePipeline();
 
+        std::unique_ptr<Vulkan::RenderPass> m_renderPass;
         std::unique_ptr<Vulkan::Pipeline> m_pipeline;
 
     private:

@@ -340,7 +340,7 @@ namespace Vulkan
         return true;
     }
 
-    bool SwapChain::CreateFrameBuffers(VkRenderPass vkRenderPass)
+    bool SwapChain::CreateFrameBuffers(RenderPass* renderPass)
     {
         DX_LOG(Info, "Vulkan SwapChain", "Creating Vulkan FrameBuffers for SwapChain...");
 
@@ -377,6 +377,7 @@ namespace Vulkan
         for (auto& swapChainImage : swapChainImages)
         {
             FrameBufferDesc frameBufferDesc = {};
+            frameBufferDesc.m_renderPass = renderPass;
             frameBufferDesc.m_colorAttachments = FrameBufferDesc::ImageAttachments{
                 {
                     swapChainImage,
@@ -388,7 +389,7 @@ namespace Vulkan
                 depthStencilImage->GetImageDesc().m_format
             };
 
-            auto frameBuffer = std::make_unique<FrameBuffer>(m_device, vkRenderPass, frameBufferDesc);
+            auto frameBuffer = std::make_unique<FrameBuffer>(m_device, frameBufferDesc);
             if (!frameBuffer->Initialize())
             {
                 DX_LOG(Error, "Vulkan SwapChain", "Failed to create FrameBuffer.");

@@ -10,13 +10,13 @@
 typedef struct VkSurfaceKHR_T* VkSurfaceKHR;
 typedef struct VkPhysicalDevice_T* VkPhysicalDevice;
 typedef struct VkSwapchainKHR_T* VkSwapchainKHR;
-typedef struct VkRenderPass_T* VkRenderPass;
 
 namespace Vulkan
 {
     class Device;
-    class FrameBuffer;
     class Image;
+    class FrameBuffer;
+    class RenderPass;
 
     // Manages the Vulkan SwapChain
     class SwapChain
@@ -33,7 +33,7 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
-        bool CreateFrameBuffers(VkRenderPass vkRenderPass);
+        bool CreateFrameBuffers(RenderPass* renderPass);
         void DestroyFrameBuffers();
 
         ResourceFormat GetImageFormat() const;

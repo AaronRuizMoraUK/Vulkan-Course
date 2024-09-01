@@ -1,6 +1,7 @@
 #include <RHI/CommandBuffer/CommandBuffer.h>
 
 #include <RHI/Device/Device.h>
+#include <RHI/RenderPass/RenderPass.h>
 #include <RHI/FrameBuffer/FrameBuffer.h>
 #include <RHI/Pipeline/Pipeline.h>
 #include <RHI/Pipeline/PipelineDescriptorSet.h>
@@ -122,7 +123,7 @@ namespace Vulkan
         VkRenderPassBeginInfo vkRenderPassBeginInfo = {};
         vkRenderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         vkRenderPassBeginInfo.pNext = nullptr;
-        vkRenderPassBeginInfo.renderPass = frameBuffer->GetVkRenderPass();
+        vkRenderPassBeginInfo.renderPass = frameBuffer->GetFrameBufferDesc().m_renderPass->GetVkRenderPass();
         vkRenderPassBeginInfo.framebuffer = frameBuffer->GetVkFrameBuffer();
         vkRenderPassBeginInfo.renderArea.offset = { 0, 0 };
         vkRenderPassBeginInfo.renderArea.extent.width = static_cast<uint32_t>(frameBufferDimensions.x);

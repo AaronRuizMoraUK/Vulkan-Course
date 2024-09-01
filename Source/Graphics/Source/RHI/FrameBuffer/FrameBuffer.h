@@ -5,19 +5,17 @@
 #include <Math/Vector2.h>
 
 typedef struct VkFramebuffer_T* VkFramebuffer;
-typedef struct VkRenderPass_T* VkRenderPass;
 typedef struct VkImageView_T* VkImageView;
 
 namespace Vulkan
 {
     class Device;
-    class Image;
 
     // Manages the Vulkan Frame Buffer
     class FrameBuffer
     {
     public:
-        FrameBuffer(Device* device, VkRenderPass vkRenderPass, const FrameBufferDesc& desc);
+        FrameBuffer(Device* device, const FrameBufferDesc& desc);
         ~FrameBuffer();
 
         FrameBuffer(const FrameBuffer&) = delete;
@@ -26,14 +24,13 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
+        const FrameBufferDesc& GetFrameBufferDesc() const;
         const Math::Vector2Int& GetDimensions() const;
 
-        VkRenderPass GetVkRenderPass();
         VkFramebuffer GetVkFrameBuffer();
 
     private:
         Device* m_device = nullptr;
-        VkRenderPass m_vkRenderPass = nullptr;
         FrameBufferDesc m_desc;
 
     private:

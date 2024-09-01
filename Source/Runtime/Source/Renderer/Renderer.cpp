@@ -4,6 +4,7 @@
 #include <RHI/Device/Instance.h>
 #include <RHI/Device/Device.h>
 #include <RHI/SwapChain/SwapChain.h>
+#include <RHI/RenderPass/RenderPass.h>
 #include <RHI/Pipeline/Pipeline.h>
 #include <RHI/Pipeline/PipelineDescriptorSet.h>
 #include <RHI/CommandBuffer/CommandBuffer.h>
@@ -56,13 +57,19 @@ namespace DX
             return false;
         }
 
-        if (!CreatePipeline())
+        if (!CreateRenderPass())
         {
             Terminate();
             return false;
         }
 
         if (!CreateFrameBuffers())
+        {
+            Terminate();
+            return false;
+        }
+
+        if (!CreatePipeline())
         {
             Terminate();
             return false;
@@ -114,6 +121,7 @@ namespace DX
         m_vkRenderFences.clear();
 
         m_pipeline.reset();
+        m_renderPass.reset();
         m_swapChain.reset();
         m_device.reset();
         m_instance.reset();
@@ -353,18 +361,14 @@ namespace DX
         return true;
     }
 
-    bool Renderer::CreatePipeline()
+    bool Renderer::CreateRenderPass()
     {
-        const Math::Rectangle viewport(
-            Math::Vector2(0.0f, 0.0f),
-            Math::Vector2(m_swapChain->GetImageSize()));
-
-        m_pipeline = std::make_unique<Vulkan::Pipeline>(m_device.get(), viewport, 
+        m_renderPass = std::make_unique<Vulkan::RenderPass>(m_device.get(),
             m_swapChain->GetImageFormat(), m_swapChain->GetDepthStencilFormat());
 
-        if (!m_pipeline->Initialize())
+        if (!m_renderPass->Initialize())
         {
-            DX_LOG(Error, "Renderer", "Failed to create pipeline.");
+            DX_LOG(Error, "Renderer", "Failed to create render pass.");
             return false;
         }
 
@@ -373,9 +377,27 @@ namespace DX
 
     bool Renderer::CreateFrameBuffers()
     {
-        if (!m_swapChain->CreateFrameBuffers(m_pipeline->GetVkRenderPass()))
+        if (!m_swapChain->CreateFrameBuffers(m_renderPass.get()))
         {
             DX_LOG(Error, "Renderer", "Failed to create frame buffers for the swap chain.");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool Renderer::CreatePipeline()
+    {
+        const uint32_t subpassIndex = 0;
+        const Math::Rectangle viewport(
+            Math::Vector2(0.0f, 0.0f),
+            Math::Vector2(m_swapChain->GetImageSize()));
+
+        m_pipeline = std::make_unique<Vulkan::Pipeline>(m_device.get(), m_renderPass.get(), subpassIndex, viewport);
+
+        if (!m_pipeline->Initialize())
+        {
+            DX_LOG(Error, "Renderer", "Failed to create pipeline.");
             return false;
         }
 
