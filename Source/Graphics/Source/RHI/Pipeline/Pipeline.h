@@ -64,7 +64,6 @@ namespace Vulkan
         bool CreateVkPipelineLayout();
         bool CreateVkPipeline();
 
-        // TODO: Obtain this from the shaders.
         std::vector<std::unique_ptr<DescriptorSetLayout>> m_descriptorSetLayouts;
         VkPipelineLayout m_vkPipelineLayout = nullptr;
 

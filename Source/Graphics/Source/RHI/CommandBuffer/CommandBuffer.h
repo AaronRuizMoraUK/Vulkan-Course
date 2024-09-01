@@ -61,11 +61,11 @@ namespace Vulkan
         // Sets which pipeline the render pass will use when calling draw.
         // The pipeline needs to compatible with the render pass.
         // 
-        // TODO: Investigate if the following is true. How a render pass with multiple subpasses is used?
-        //       One pipeline will be used with one subpass of the render pass. The pipeline
-        //       knows which subpass is. So it needs to be bound as many pipelines as there are subpasses before
-        //       calling draw. For example, a render pass with 2 subpasses will need 2 BindPipeline calls where the
-        //       first pipeline was created for subpass 0 and the second pipeline was created for subpass 1. 
+        // TODO: Investigate if the following is true. How does a render pass with multiple subpasses work?
+        //       One pipeline will be used with one subpass of the render pass. 
+        //       So, inside a Begin/EndRenderPass block, it needs to bind and draw using pipeline for first subpass,
+        //       then bind and draw with the pipeline of second subpass and so on for how many subpasses there are
+        //       in the render pass.
         void BindPipeline(Pipeline* pipeline);
 
         void BindPipelineDescriptorSet(PipelineDescriptorSet* descriptorSet);
