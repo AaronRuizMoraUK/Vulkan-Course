@@ -288,7 +288,7 @@ namespace DX
         if (commandBuffer->Begin())
         {
             commandBuffer->BeginRenderPass(frameBuffer,
-                Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f),
+                { Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f) },
                 1.0f);
 
             commandBuffer->BindPipeline(m_pipeline.get());

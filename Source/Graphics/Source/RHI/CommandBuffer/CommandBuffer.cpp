@@ -91,22 +91,41 @@ namespace Vulkan
 
     void CommandBuffer::BeginRenderPass(
         FrameBuffer* frameBuffer,
-        std::optional<Math::Color> clearColor,
+        std::vector<Math::Color> clearColors,
         std::optional<float> clearDepth,
         std::optional<uint8_t> clearStencil)
     {
-        // TODO: Build clearValues by asking the frame buffer how many color and depth attachments it has.
+        const size_t numColorAttachments = frameBuffer->GetFrameBufferDesc().m_colorAttachments.size();
+        const bool hasDepthStencilAttachment = frameBuffer->GetFrameBufferDesc().m_depthStencilAttachment.m_image != nullptr;
+        const Math::Vector2Int& frameBufferDimensions = frameBuffer->GetDimensions();
+
+        if (numColorAttachments != clearColors.size())
+        {
+            DX_LOG(Warning, "Vulkan CommandBuffer", 
+                "Frame buffer has %d color attachments but %d clear color values were provided.",
+                numColorAttachments, clearColors.size());
+        }
+
+        if (hasDepthStencilAttachment && !clearDepth.has_value() && !clearStencil.has_value())
+        {
+            DX_LOG(Warning, "Vulkan CommandBuffer",
+                "Frame buffer has a depth stencil attachment but no clear values for depth or stencil were provided.");
+        }
+
         // Clear values needs to match 1:1 with attachments in frame buffer
+
         std::vector<VkClearValue> clearValues;
-        if (clearColor.has_value())
+        for (size_t i = 0; i < numColorAttachments; ++i)
         {
             const VkClearValue colorClearValue = {
-                .color = { clearColor->x, clearColor->y, clearColor->z, clearColor->w }
+                .color = (i < clearColors.size())
+                    ? VkClearColorValue{ clearColors[i].x, clearColors[i].y, clearColors[i].z, clearColors[i].w }
+                    : VkClearColorValue{ 0.0f, 0.0f, 0.0f, 1.0f }
             };
             clearValues.push_back(colorClearValue);
         }
 
-        if (clearDepth.has_value() || clearStencil.has_value())
+        if (hasDepthStencilAttachment)
         {
             const VkClearValue depthStencilClearValue = {
                 .depthStencil = {
@@ -116,8 +135,6 @@ namespace Vulkan
             };
             clearValues.push_back(depthStencilClearValue);
         }
-
-        const auto& frameBufferDimensions = frameBuffer->GetDimensions();
 
         // Information about how to begin a render pass (only needed for graphics operations)
         VkRenderPassBeginInfo vkRenderPassBeginInfo = {};

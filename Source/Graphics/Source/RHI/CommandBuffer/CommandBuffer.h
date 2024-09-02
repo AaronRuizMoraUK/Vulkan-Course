@@ -53,7 +53,7 @@ namespace Vulkan
         // Begin a render pass to an specific frame buffer.
         // The render pass is obtained from the frame buffer as it stores which render pass is compatible with.
         void BeginRenderPass(FrameBuffer* frameBuffer,
-            std::optional<Math::Color> clearColor,
+            std::vector<Math::Color> clearColors,
             std::optional<float> clearDepth = std::nullopt,
             std::optional<uint8_t> clearStencil = std::nullopt);
         void EndRenderPass();
