@@ -31,7 +31,7 @@ namespace Vulkan
             }
         }
 
-        DX_LOG(Warning, "Utils", "Compatible memory not found!");
+        DX_LOG(Warning, "Vulkan Utils", "Compatible memory not found!");
         return std::numeric_limits<uint32_t>::max();
     }
 
@@ -269,7 +269,7 @@ namespace Vulkan
         case ResourceFormat::ASTC_12x12_SRGB_BLOCK:       return VK_FORMAT_ASTC_12x12_SRGB_BLOCK;
 
         default:
-            DX_LOG(Fatal, "Utils", "Unknown resource format %d", format);
+            DX_LOG(Fatal, "Vulkan Utils", "Unknown resource format %d", format);
             return VK_FORMAT_UNDEFINED;
         }
     }
@@ -478,7 +478,7 @@ namespace Vulkan
         case VK_FORMAT_ASTC_12x12_SRGB_BLOCK:       return ResourceFormat::ASTC_12x12_SRGB_BLOCK;
 
         default:
-            DX_LOG(Fatal, "Utils", "Unknown resource format %d", vkFormat);
+            DX_LOG(Fatal, "Vulkan Utils", "Unknown resource format %d", vkFormat);
             return ResourceFormat::Unknown;
         }
     }
@@ -493,7 +493,7 @@ namespace Vulkan
 
         case ImageType::Unknown:
         default:
-            DX_LOG(Fatal, "Utils", "Unknown image type %d", imageType);
+            DX_LOG(Fatal, "Vulkan Utils", "Unknown image type %d", imageType);
             return VK_IMAGE_TYPE_MAX_ENUM;
         }
     }
@@ -507,7 +507,7 @@ namespace Vulkan
 
         case ImageTiling::Unknown:
         default:
-            DX_LOG(Fatal, "Utils", "Unknown image tiling %d", imageTiling);
+            DX_LOG(Fatal, "Vulkan Utils", "Unknown image tiling %d", imageTiling);
             return VK_IMAGE_TILING_MAX_ENUM;
         }
     }
@@ -531,6 +531,8 @@ namespace Vulkan
         vkBufferUsageFlags |= (flags & BufferUsage_VertexBuffer) ? VK_BUFFER_USAGE_VERTEX_BUFFER_BIT : 0;
         vkBufferUsageFlags |= (flags & BufferUsage_IndexBuffer) ? VK_BUFFER_USAGE_INDEX_BUFFER_BIT : 0;
         vkBufferUsageFlags |= (flags & BufferUsage_UniformBuffer) ? VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT : 0;
+        vkBufferUsageFlags |= (flags & BufferUsage_TransferSrc) ? VK_BUFFER_USAGE_TRANSFER_SRC_BIT: 0;
+        vkBufferUsageFlags |= (flags & BufferUsage_TransferDst) ? VK_BUFFER_USAGE_TRANSFER_DST_BIT : 0;
 
         return vkBufferUsageFlags;
     }
@@ -559,7 +561,7 @@ namespace Vulkan
 
         case ShaderType_Unknown:
         default:
-            DX_LOG(Fatal, "Utils", "Unknown shader type %d", shaderType);
+            DX_LOG(Fatal, "Vulkan Utils", "Unknown shader type %d", shaderType);
             return 0;
         }
     }

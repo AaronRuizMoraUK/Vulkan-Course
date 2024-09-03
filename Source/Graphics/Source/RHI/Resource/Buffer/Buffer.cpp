@@ -15,26 +15,6 @@ namespace Vulkan
 {
     namespace Utils
     {
-        void DestroyVkBuffer(Device* device, VkBuffer& vkBuffer, VkDeviceMemory& vkBufferMemory);
-
-        // Helper to destroy stage buffer when getting out of scope.
-        struct ScopedBuffer
-        {
-            VkBuffer m_vkBuffer = nullptr;
-            VkDeviceMemory m_vkBufferMemory = nullptr;
-
-            ScopedBuffer(Device* device)
-                : m_device(device)
-            {
-            }
-            ~ScopedBuffer()
-            {
-                DestroyVkBuffer(m_device, m_vkBuffer, m_vkBufferMemory);
-            }
-        private:
-            Device* m_device = nullptr;
-        };
-
         bool CreateVkBuffer(Device* device,
             size_t bufferSize,
             VkBufferUsageFlags vkBufferUsageFlags, 
@@ -113,7 +93,7 @@ namespace Vulkan
             vkBufferMemory = nullptr;
         }
 
-        bool CopyVkBuffer(Device* device, VkBuffer vkDstBuffer, VkBuffer vkSrcBuffer, size_t bufferSize)
+        bool CopyBuffer(Device* device, Buffer* dstBuffer, Buffer* srcBuffer)
         {
             // Command buffer for transfer commands.
             // By Vulkan standards, graphical queues also support transfer commands.
@@ -123,9 +103,10 @@ namespace Vulkan
             {
                 // Record transfer commands to the command buffer.
                 // Since it's a transfer operation, there is no need to bind render pass or pipelines.
+                // NOTE: To be more accurate, there is an implicit pipeline of only 1 stage which is to do the transfer.
                 if (transferCmdBuffer.Begin(CommandBufferUsage_OneTimeSubmit))
                 {
-                    transferCmdBuffer.CopyBuffer(vkDstBuffer, vkSrcBuffer, bufferSize);
+                    transferCmdBuffer.CopyBuffer(dstBuffer, srcBuffer);
 
                     transferCmdBuffer.End();
                 }
@@ -155,7 +136,6 @@ namespace Vulkan
                 vkSubmitInfo.pSignalSemaphores = nullptr;
 
                 // Submit command buffer to queue for execution by the GPU
-                // Pass the render fence of the current frame, so when it's finished drawing it will signal it.
                 if (vkQueueSubmit(device->GetVkQueue(Vulkan::QueueFamilyType_Graphics),
                     1, &vkSubmitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
                 {
@@ -250,7 +230,7 @@ namespace Vulkan
 
         if (!Utils::CopyDataToVkBufferMemory(m_device, m_vkBufferMemory, data, dataSize))
         {
-            DX_LOG(Error, "Vulkan Buffer", "Failed to map Vulkan buffer memory.");
+            DX_LOG(Error, "Vulkan Buffer", "Failed to copy data to Vulkan buffer memory.");
             return false;
         }
 
@@ -306,34 +286,30 @@ namespace Vulkan
             if (m_desc.m_initialData)
             {
                 // Create staging source buffer to put data before transferring to GPU
-                Utils::ScopedBuffer stageBuffer(m_device);
+                std::unique_ptr<Buffer> stageBuffer;
                 {
-                    const VkBufferUsageFlags vkBufferUsageFlags =
-                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT; // Source of the transfer
+                    BufferDesc stageBufferDesc = {};
+                    stageBufferDesc.m_elementSizeInBytes = m_desc.m_elementSizeInBytes;
+                    stageBufferDesc.m_elementCount = m_desc.m_elementCount;
+                    stageBufferDesc.m_usageFlags = BufferUsage_TransferSrc; // Source of the transfer
+                    stageBufferDesc.m_memoryProperty = ResourceMemoryProperty::HostVisible;
+                    stageBufferDesc.m_initialData = m_desc.m_initialData;
 
-                    const VkMemoryPropertyFlags vkMemoryProperties =
-                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-
-                    if (!Utils::CreateVkBuffer(m_device, bufferSize,
-                        vkBufferUsageFlags, vkMemoryProperties, &stageBuffer.m_vkBuffer, &stageBuffer.m_vkBufferMemory))
+                    stageBuffer = std::make_unique<Buffer>(m_device, stageBufferDesc);
+                    if (!stageBuffer->Initialize())
                     {
+                        DX_LOG(Error, "Vulkan Buffer", "Failed to create Vulkan staging buffer.");
                         return false;
                     }
                 }
 
-                // Copy data to "stage" buffer
-                if (!Utils::CopyDataToVkBufferMemory(m_device, stageBuffer.m_vkBufferMemory, m_desc.m_initialData, bufferSize))
-                {
-                    DX_LOG(Error, "Vulkan Buffer", "Failed to map Vulkan buffer memory.");
-                    return false;
-                }
-
                 // Create destination buffer in GPU
                 {
-                    const VkBufferUsageFlags vkBufferUsageFlags =
-                        VK_BUFFER_USAGE_TRANSFER_DST_BIT | // Destination of the transfer
-                        ToVkBufferUsageFlags(m_desc.m_usageFlags);
+                    // This buffer will be the target of a transfer require, so adding the
+                    // transfer destination flag on top of the actual usage.
+                    m_desc.m_usageFlags |= BufferUsage_TransferDst;
+
+                    const VkBufferUsageFlags vkBufferUsageFlags = ToVkBufferUsageFlags(m_desc.m_usageFlags);
 
                     // Memory properties we want:
                     // - VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT: visible to the GPU only (optimal for GPU performance)
@@ -347,7 +323,7 @@ namespace Vulkan
                 }
 
                 // Execute commands to copy staging buffer to destination buffer on GPU
-                if (!Utils::CopyVkBuffer(m_device, m_vkBuffer, stageBuffer.m_vkBuffer, bufferSize))
+                if (!Utils::CopyBuffer(m_device, this, stageBuffer.get()))
                 {
                     return false;
                 }

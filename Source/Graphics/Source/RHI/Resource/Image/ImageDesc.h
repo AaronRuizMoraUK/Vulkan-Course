@@ -17,7 +17,6 @@ namespace Vulkan
         ResourceFormat m_format;
         ImageTiling m_tiling;
         ImageUsageFlags m_usageFlags; // Bitwise operation of ImageUsageFlags
-        ResourceMemoryProperty m_memoryProperty;
 
         const void* m_initialData;
 

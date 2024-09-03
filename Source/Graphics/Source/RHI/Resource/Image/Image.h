@@ -31,6 +31,7 @@ namespace Vulkan
         ImageDesc m_desc;
 
     private:
+        uint32_t CalculateImageMemorySize() const;
         bool CreateVkImage();
 
         VkImage m_vkImage = nullptr;

@@ -10,7 +10,6 @@
 
 typedef struct VkCommandBuffer_T* VkCommandBuffer;
 typedef struct VkCommandPool_T* VkCommandPool;
-typedef struct VkBuffer_T* VkBuffer;
 
 namespace Vulkan
 {
@@ -19,6 +18,7 @@ namespace Vulkan
     class Pipeline;
     class PipelineDescriptorSet;
     class Buffer;
+    class Image;
 
     // Manages a Vulkan Command Buffer
     class CommandBuffer
@@ -80,7 +80,15 @@ namespace Vulkan
 
         // -- Transfer commands --
 
-        void CopyBuffer(VkBuffer vkDstBuffer, VkBuffer vkSrcBuffer, size_t bufferSize);
+        void CopyBuffer(Buffer* dstBuffer, Buffer* srcBuffer);
+        void CopyBufferToImage(Image* dstImage, Buffer* srcBuffer);
+
+        // -- Barrier commands --
+
+        void PipelineImageMemoryBarrier(Image* image, 
+            int oldImageLayout, int newImageLayout,
+            int srcPipelineStage, int srcAccessMask,
+            int dstPipelineStage, int dstAccessMask);
 
     private:
         Device* m_device = nullptr;

@@ -35,6 +35,7 @@ namespace Vulkan
         const DescriptorSetLayout* GetDescriptorSetLayout() const;
         VkDescriptorSet GetVkDescriptorSet();
 
+        // Set resources using layout binding index inside the descriptor set layout.
         void SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer);
         void SetUniformBufferDynamic(uint32_t layoutBinding, Buffer* buffer);
 

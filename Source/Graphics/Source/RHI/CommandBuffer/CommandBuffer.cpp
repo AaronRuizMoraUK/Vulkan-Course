@@ -6,6 +6,7 @@
 #include <RHI/Pipeline/Pipeline.h>
 #include <RHI/Pipeline/PipelineDescriptorSet.h>
 #include <RHI/Resource/Buffer/Buffer.h>
+#include <RHI/Resource/Image/Image.h>
 #include <RHI/Vulkan/Utils.h>
 
 #include <Log/Log.h>
@@ -271,16 +272,129 @@ namespace Vulkan
         vkCmdDrawIndexed(m_vkCommandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
     }
 
-    void CommandBuffer::CopyBuffer(VkBuffer vkDstBuffer, VkBuffer vkSrcBuffer, size_t bufferSize)
+    void CommandBuffer::CopyBuffer(Buffer* dstBuffer, Buffer* srcBuffer)
     {
+        DX_ASSERT(srcBuffer->GetBufferDesc().m_elementSizeInBytes == dstBuffer->GetBufferDesc().m_elementSizeInBytes,
+            "Command Buffer", "Cannot copy buffers with different element size");
+        DX_ASSERT(srcBuffer->GetBufferDesc().m_elementCount <= dstBuffer->GetBufferDesc().m_elementCount,
+            "Command Buffer", "Trying to copy %d elements into a buffer with %d elements",
+            srcBuffer->GetBufferDesc().m_elementCount, dstBuffer->GetBufferDesc().m_elementCount);
+
         // Region of data to copy from and to
         const VkBufferCopy vkBufferCopyRegion = {
             .srcOffset = 0,
             .dstOffset = 0,
-            .size = bufferSize
+            .size = srcBuffer->GetBufferDesc().m_elementSizeInBytes * srcBuffer->GetBufferDesc().m_elementCount
         };
 
-        vkCmdCopyBuffer(m_vkCommandBuffer, vkSrcBuffer, vkDstBuffer, 1, &vkBufferCopyRegion);
+        vkCmdCopyBuffer(m_vkCommandBuffer, srcBuffer->GetVkBuffer(), dstBuffer->GetVkBuffer(), 1, &vkBufferCopyRegion);
+    }
+
+    void CommandBuffer::CopyBufferToImage(Image* dstImage, Buffer* srcBuffer)
+    {
+        // Generate image regions (one per mip level) to copy
+        std::vector<VkBufferImageCopy> vkBufferImageCopyRegions;
+        {
+            const ResourceFormat imageFormat = dstImage->GetImageDesc().m_format;
+            const Math::Vector3Int& imageDimensions = dstImage->GetImageDesc().m_dimensions;
+            const uint32_t imageMipCount = dstImage->GetImageDesc().m_mipCount;
+
+            vkBufferImageCopyRegions.resize(imageMipCount);
+
+            uint32_t bufferOffset = 0;
+            for (uint32_t mipLevel = 0; mipLevel < imageMipCount; ++mipLevel)
+            {
+                const uint32_t mipSizeX = std::max<uint32_t>(1, imageDimensions.x >> mipLevel);
+                const uint32_t mipSizeY = std::max<uint32_t>(1, imageDimensions.y >> mipLevel);
+                const uint32_t mipSizeZ = std::max<uint32_t>(1, imageDimensions.z >> mipLevel);
+                const uint32_t mipBytes = ResourceFormatSize(imageFormat, mipSizeX * mipSizeY * mipSizeZ);
+
+                vkBufferImageCopyRegions[mipLevel] = VkBufferImageCopy{
+                    .bufferOffset = bufferOffset,
+                    .bufferRowLength = 0, // When row or image lengths are zero the memory is considered to be tightly packed according to the imageExtent
+                    .bufferImageHeight = 0,
+                    .imageSubresource = {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, // Which aspect of image to copy
+                        .mipLevel = mipLevel, // Mip level to copy
+                        .baseArrayLayer = 0, // Starting array layer (if array)
+                        .layerCount = 1 // Number of layers to copy starting from baseArrayLayer
+                    },
+                    .imageOffset = {0, 0, 0},
+                    .imageExtent = {mipSizeX, mipSizeY, mipSizeZ}
+                };
+
+                bufferOffset += mipBytes;
+            }
+
+            DX_ASSERT(srcBuffer->GetBufferDesc().m_elementSizeInBytes * srcBuffer->GetBufferDesc().m_elementCount <= bufferOffset,
+                "Command Buffer", "Trying to copy %d bytes into a texture with %d bytes",
+                srcBuffer->GetBufferDesc().m_elementSizeInBytes * srcBuffer->GetBufferDesc().m_elementCount, bufferOffset);
+        }
+
+        // How is the image memory set to be read and written to.
+        const VkImageLayout vkDstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+        vkCmdCopyBufferToImage(m_vkCommandBuffer, srcBuffer->GetVkBuffer(), dstImage->GetVkImage(), vkDstImageLayout, 
+            static_cast<uint32_t>(vkBufferImageCopyRegions.size()), vkBufferImageCopyRegions.data());
+    }
+
+    void CommandBuffer::PipelineImageMemoryBarrier(Image* image, 
+        int oldImageLayout, int newImageLayout,
+        int srcPipelineStage, int srcAccessMask,
+        int dstPipelineStage, int dstAccessMask)
+    {
+        const VkImageLayout vkOldImageLayout = static_cast<VkImageLayout>(oldImageLayout);
+        const VkImageLayout vkNewImageLayout = static_cast<VkImageLayout>(newImageLayout);
+
+        // About barriers
+        // 
+        // A barrier specifies dependencies between stages in a pipeline.
+        // In other words, what stages of a pipeline depend on others finishing first.
+        // Same as subpass dependencies it goes another level deeper and can specify
+        // the Access Mask inside the stage, that's "what operation within the stage".
+        //
+        // On top of specifying dependencies, the barrier can also achieve 2 more things:
+        // - Change the layout between the two stages specified.
+        // - Change the queue family between the two stages specified.
+        //
+        // Out main goal in this function using the barrier is to change the image layout from
+        // VK_IMAGE_LAYOUT_UNDEFINED (how it was created in CreateVkImage) to
+        // VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL (expected by CopyBufferToImage).
+        //
+        // Note that the stages are specified as parameters in vkCmdPipelineBarrier and their
+        // access masks in VkImageMemoryBarrier.
+        //
+        // There are other types of barriers, this is a image memory barrier. There are also
+        // global memory and buffer memory barriers, but all of them work in the similar way
+        // as explained here.
+
+        // Transition must happen AFTER srcPipelineStage stage and srcAccessMask access.
+        // Transition must happen BEFORE dstPipelineStage stage and dstAccessMask access.
+
+        VkImageMemoryBarrier vkImageMemoryBarrier = {};
+        vkImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        vkImageMemoryBarrier.pNext = nullptr;
+        vkImageMemoryBarrier.srcAccessMask = srcAccessMask; // Memory operation (in src stage) indicating "after this point"
+        vkImageMemoryBarrier.dstAccessMask = dstAccessMask; // Memory operation (in dst stage) indicating "before this point"
+        vkImageMemoryBarrier.oldLayout = vkOldImageLayout; // Layout to transition from
+        vkImageMemoryBarrier.newLayout = vkNewImageLayout; // Layout to transition too
+        vkImageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; // Queue family to transition from
+        vkImageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED; // Queue family to transition to
+        vkImageMemoryBarrier.image = image->GetVkImage();
+        vkImageMemoryBarrier.subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, // Aspect of image being altered
+            .baseMipLevel = 0, // First mip level to start alterations on
+            .levelCount = image->GetImageDesc().m_mipCount, // Number of mip level to alter staring from baseMipLevel
+            .baseArrayLayer = 0, // First array to start alterations on
+            .layerCount = 1 // Number of arrays to alter staring from baseArrayLayer
+        };
+
+        vkCmdPipelineBarrier(m_vkCommandBuffer,
+            srcPipelineStage, dstPipelineStage,
+            0, // Dependency flags
+            0, nullptr, // Global memory barriers
+            0, nullptr, // Buffer memory barriers
+            1, &vkImageMemoryBarrier); // Image memory barriers
     }
 
     bool CommandBuffer::AllocateVkCommandBuffer()

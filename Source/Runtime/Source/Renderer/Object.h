@@ -5,10 +5,12 @@
 
 #include <vector>
 #include <memory>
+#include <string>
 
 namespace Vulkan
 {
     class Buffer;
+    class Image;
 }
 
 namespace DX
@@ -31,26 +33,27 @@ namespace DX
     protected:
         void CreateBuffers();
 
-        uint32_t GetVertexSize() const { return sizeof(VertexPC); }
+        uint32_t GetVertexSize() const { return sizeof(VertexPUv); }
         uint32_t GetIndexSize() const { return sizeof(Index); }
 
         Math::Transform m_transform = Math::Transform::CreateIdentity();
 
         // Filled by subclass
-        std::vector<VertexPC> m_vertexData;
+        std::vector<VertexPUv> m_vertexData;
         std::vector<Index> m_indexData;
+
+        // Filled by subclass
+        std::string m_diffuseFilename;
+        std::string m_emissiveFilename;
+        std::string m_normalFilename;
 
     private:
         std::shared_ptr<Vulkan::Buffer> m_vertexBuffer;
         std::shared_ptr<Vulkan::Buffer> m_indexBuffer;
-    };
 
-    class SimpleObject : public Object
-    {
-    public:
-        SimpleObject(const Math::Transform& transform,
-            const std::vector<VertexPC>& vertexData,
-            const std::vector<Index> indexData);
+        std::shared_ptr<Vulkan::Image> m_diffuseTexture;
+        std::shared_ptr<Vulkan::Image> m_emissiveTexture;
+        std::shared_ptr<Vulkan::Image> m_normalTexture;
     };
 
     class Cube : public Object
@@ -58,5 +61,15 @@ namespace DX
     public:
         Cube(const Math::Transform& transform, 
             const Math::Vector3& extends);
+    };
+
+    class Mesh : public Object
+    {
+    public:
+        Mesh(const Math::Transform& transform,
+            const std::string& meshFilename,
+            const std::string& diffuseFilename,
+            const std::string& normalFilename,
+            const std::string& emissiveFilename = "");
     };
 } // namespace DX

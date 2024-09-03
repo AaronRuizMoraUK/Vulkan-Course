@@ -1,8 +1,11 @@
 #include <Renderer/Object.h>
 #include <Renderer/RendererManager.h>
+#include <Assets/TextureAsset.h>
+#include <Assets/MeshAsset.h>
 
 #include <RHI/Device/Device.h>
 #include <RHI/Resource/Buffer/Buffer.h>
+#include <RHI/Resource/Image/Image.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -64,29 +67,52 @@ namespace DX
                 return;
             }
         }
-    }
 
-    SimpleObject::SimpleObject(const Math::Transform& transform,
-        const std::vector<VertexPC>& vertexData,
-        const std::vector<Index> indexData)
-    {
-        m_transform = transform;
-        m_vertexData = vertexData;
-        m_indexData = indexData;
+        // Diffuse Texture
+        {
+            auto textureAsset = TextureAsset::LoadTextureAsset(m_diffuseFilename);
+            DX_ASSERT(textureAsset.get(), "Object", "Failed to load texture");
 
-        CreateBuffers();
+            Vulkan::ImageDesc imageDesc = {};
+            imageDesc.m_imageType = Vulkan::ImageType::Image2D;
+            imageDesc.m_dimensions = Math::Vector3Int(textureAsset->GetData()->m_size, 1);
+            imageDesc.m_mipCount = 1;
+            imageDesc.m_format = Vulkan::ResourceFormat::R8G8B8A8_UNORM;
+            imageDesc.m_tiling = Vulkan::ImageTiling::Optimal;
+            imageDesc.m_usageFlags = Vulkan::ImageUsage_Sampled;
+            imageDesc.m_initialData = textureAsset->GetData()->m_data;
+
+            m_diffuseTexture = std::make_shared<Vulkan::Image>(renderer->GetDevice(), imageDesc);
+            if (!m_diffuseTexture->Initialize())
+            {
+                DX_LOG(Fatal, "Object", "Failed to create diffuse texture.");
+                return;
+            }
+
+            // TODO
+            //ShaderResourceViewDesc srvDesc = {};
+            //srvDesc.m_resource = m_diffuseTexture;
+            //srvDesc.m_viewFormat = textureDesc.m_format;
+            //srvDesc.m_firstMip = 0;
+            //srvDesc.m_mipCount = -1;
+            //
+            //m_diffuseTextureView = renderer->GetDevice()->CreateShaderResourceView(srvDesc);
+        }
     }
 
     Cube::Cube(const Math::Transform& transform,
         const Math::Vector3& extends)
     {
         m_transform = transform;
+        m_diffuseFilename = "Textures/Wall_Stone_Albedo.png";
+        m_normalFilename = "Textures/Wall_Stone_Normal.png";
 
         const Math::Vector3 half = 0.5f * extends;
 
         // 6 faces, 2 triangles each face, 3 vertices each triangle.
         // Clockwise order (CW) - LeftHand
 
+        /*
         m_vertexData =
         {
             // Front face
@@ -125,47 +151,46 @@ namespace DX
             { Math::Vector3Packed({-half.x, -half.y, -half.z}), Math::ColorPacked(Math::Colors::Purple) },
             { Math::Vector3Packed({-half.x, -half.y,  half.z}), Math::ColorPacked(Math::Colors::Purple) },
         };
+        */
 
-        /*
         m_vertexData =
         {
             // Front face
-            { Math::Vector3Packed({-half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Back face
-            { Math::Vector3Packed({ half.x, -half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x, -half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Right face
-            { Math::Vector3Packed({ half.x, -half.y, -half.z}), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y, -half.z}), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x, -half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y, -half.z}), /*Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y, -half.z}), /*Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Left face
-            { Math::Vector3Packed({-half.x, -half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y,  half.z}), /*Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y,  half.z}), /*Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Top face
-            { Math::Vector3Packed({-half.x,  half.y, -half.z}), Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y, -half.z}), Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y, -half.z}), /*Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y, -half.z}), /*Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Bottom face
-            { Math::Vector3Packed({ half.x, -half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({ half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x, -half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y,  half.z}), /*Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y,  half.z}), /*Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
         };
-        */
 
         m_indexData =
         {
@@ -193,6 +218,44 @@ namespace DX
             20, 23, 22,
             22, 21, 20
         };
+
+        CreateBuffers();
+    }
+
+    Mesh::Mesh(const Math::Transform& transform,
+        const std::string& meshFilename,
+        const std::string& diffuseFilename,
+        const std::string& normalFilename,
+        const std::string& emissiveFilename)
+    {
+        m_transform = transform;
+        m_diffuseFilename = diffuseFilename;
+        m_normalFilename = normalFilename;
+        m_emissiveFilename = emissiveFilename;
+
+        auto meshAsset = MeshAsset::LoadMeshAsset(meshFilename);
+        if (!meshAsset)
+        {
+            DX_LOG(Fatal, "Mesh", "Failed to load mesh asset %s", meshFilename.c_str());
+            return;
+        }
+
+        const MeshData* meshData = meshAsset->GetData();
+
+        m_vertexData.resize(meshData->m_positions.size());
+        for (uint32_t i = 0; i < meshData->m_positions.size(); ++i)
+        {
+            m_vertexData[i] = VertexPUv
+            {
+                .m_position = meshData->m_positions[i],
+                //.m_normal = meshData->m_normals[i],
+                //.m_tangent = meshData->m_tangents[i],
+                //.m_binormal = meshData->m_binormals[i],
+                .m_uv = meshData->m_textCoords[i]
+            };
+        }
+
+        m_indexData = meshData->m_indices;
 
         CreateBuffers();
     }

@@ -329,13 +329,13 @@ namespace Vulkan
             // Pipeline Vertex Input State (Input Layout)
             const VkVertexInputBindingDescription vkVertexInputBindingDesc = {
                 .binding = 0, // Stream
-                .stride = (3 + 4) * 4, // sizeof(VertexPC)
+                .stride = (3 + 2) * 4, // sizeof(VertexPUv)
                 .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
             };
 
             const std::vector<VkVertexInputAttributeDescription> vkVertexInputAttributesDesc = {
-                {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},
-                {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32A32_SFLOAT, .offset = 3 * 4 /*offsetof(VertexPC, m_color)*/}
+                { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},
+                { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = (3) * 4 /*offsetof(VertexPUv, m_uv)*/ },
             };
 
             VkPipelineVertexInputStateCreateInfo vkPipelineVertexInputStateCreateInfo = {};

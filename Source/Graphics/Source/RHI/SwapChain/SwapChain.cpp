@@ -356,12 +356,11 @@ namespace Vulkan
         {
             ImageDesc depthStencilImageDesc = {};
             depthStencilImageDesc.m_imageType = ImageType::Image2D;
-            depthStencilImageDesc.m_dimensions = Math::Vector3Int(m_imageSize.x, m_imageSize.y, 1);
+            depthStencilImageDesc.m_dimensions = Math::Vector3Int(m_imageSize, 1);
             depthStencilImageDesc.m_mipCount = 1;
             depthStencilImageDesc.m_format = m_depthStencilFormat;
             depthStencilImageDesc.m_tiling = ImageTiling::Optimal;
             depthStencilImageDesc.m_usageFlags = ImageUsage_DepthStencilAttachment;
-            depthStencilImageDesc.m_memoryProperty = ResourceMemoryProperty::DeviceLocal;
 
             depthStencilImage = std::make_shared<Image>(m_device, depthStencilImageDesc);
             if (!depthStencilImage->Initialize())
@@ -434,12 +433,11 @@ namespace Vulkan
         {
             ImageDesc imageDesc = {};
             imageDesc.m_imageType = ImageType::Image2D;
-            imageDesc.m_dimensions = Math::Vector3Int(m_imageSize.x, m_imageSize.y, 1);
+            imageDesc.m_dimensions = Math::Vector3Int(m_imageSize, 1);
             imageDesc.m_mipCount = 1;
             imageDesc.m_format = m_imageFormat;
             imageDesc.m_tiling = ImageTiling::Optimal;
             imageDesc.m_usageFlags = ImageUsage_ColorAttachment;
-            imageDesc.m_memoryProperty = ResourceMemoryProperty::DeviceLocal;
             imageDesc.m_nativeResource = ImageDesc::NativeResource {
                .m_imageNativeResource = vkSwapChainImage,
                .m_imageMemoryNativeResource = nullptr,
