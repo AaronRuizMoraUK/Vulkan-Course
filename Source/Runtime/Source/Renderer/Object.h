@@ -11,6 +11,7 @@ namespace Vulkan
 {
     class Buffer;
     class Image;
+    class ImageView;
 }
 
 namespace DX
@@ -26,6 +27,10 @@ namespace DX
         Math::Transform& GetTransform() { return m_transform; }
         const Math::Transform& GetTransform() const { return m_transform; }
         void SetTransform(const Math::Transform& transform) { m_transform = transform; }
+
+        std::shared_ptr<Vulkan::ImageView> GetDiffuseImageView() const;
+        std::shared_ptr<Vulkan::ImageView> GetEmissiveImageView() const;
+        std::shared_ptr<Vulkan::ImageView> GetNormalImageView() const;
 
         std::shared_ptr<Vulkan::Buffer> GetVertexBuffer() const;
         std::shared_ptr<Vulkan::Buffer> GetIndexBuffer() const;
@@ -51,9 +56,12 @@ namespace DX
         std::shared_ptr<Vulkan::Buffer> m_vertexBuffer;
         std::shared_ptr<Vulkan::Buffer> m_indexBuffer;
 
-        std::shared_ptr<Vulkan::Image> m_diffuseTexture;
-        std::shared_ptr<Vulkan::Image> m_emissiveTexture;
-        std::shared_ptr<Vulkan::Image> m_normalTexture;
+        std::shared_ptr<Vulkan::Image> m_diffuseImage;
+        std::shared_ptr<Vulkan::Image> m_emissiveImage;
+        std::shared_ptr<Vulkan::Image> m_normalImage;
+        std::shared_ptr<Vulkan::ImageView> m_diffuseImageView;
+        std::shared_ptr<Vulkan::ImageView> m_emissiveImageView;
+        std::shared_ptr<Vulkan::ImageView> m_normalImageView;
     };
 
     class Cube : public Object

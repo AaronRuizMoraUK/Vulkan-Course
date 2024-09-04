@@ -6,6 +6,7 @@
 #include <RHI/Device/Device.h>
 #include <RHI/Resource/Buffer/Buffer.h>
 #include <RHI/Resource/Image/Image.h>
+#include <RHI/Resource/ImageView/ImageView.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -18,6 +19,21 @@ namespace DX
     Object::Object() = default;
 
     Object::~Object() = default;
+
+    std::shared_ptr<Vulkan::ImageView> Object::GetDiffuseImageView() const
+    {
+        return m_diffuseImageView;
+    }
+
+    std::shared_ptr<Vulkan::ImageView> Object::GetEmissiveImageView() const
+    {
+        return m_emissiveImageView;
+    }
+
+    std::shared_ptr<Vulkan::ImageView> Object::GetNormalImageView() const
+    {
+        return m_normalImageView;
+    }
 
     std::shared_ptr<Vulkan::Buffer> Object::GetVertexBuffer() const
     {
@@ -82,21 +98,26 @@ namespace DX
             imageDesc.m_usageFlags = Vulkan::ImageUsage_Sampled;
             imageDesc.m_initialData = textureAsset->GetData()->m_data;
 
-            m_diffuseTexture = std::make_shared<Vulkan::Image>(renderer->GetDevice(), imageDesc);
-            if (!m_diffuseTexture->Initialize())
+            m_diffuseImage = std::make_shared<Vulkan::Image>(renderer->GetDevice(), imageDesc);
+            if (!m_diffuseImage->Initialize())
             {
-                DX_LOG(Fatal, "Object", "Failed to create diffuse texture.");
+                DX_LOG(Fatal, "Object", "Failed to create diffuse image.");
                 return;
             }
 
-            // TODO
-            //ShaderResourceViewDesc srvDesc = {};
-            //srvDesc.m_resource = m_diffuseTexture;
-            //srvDesc.m_viewFormat = textureDesc.m_format;
-            //srvDesc.m_firstMip = 0;
-            //srvDesc.m_mipCount = -1;
-            //
-            //m_diffuseTextureView = renderer->GetDevice()->CreateShaderResourceView(srvDesc);
+            Vulkan::ImageViewDesc imageViewDesc = {};
+            imageViewDesc.m_image = m_diffuseImage;
+            imageViewDesc.m_viewFormat = m_diffuseImage->GetImageDesc().m_format;
+            imageViewDesc.m_aspectFlags = Vulkan::ImageViewAspect_Color;
+            imageViewDesc.m_firstMip = 0;
+            imageViewDesc.m_mipCount = 0;
+
+            m_diffuseImageView = std::make_shared<Vulkan::ImageView>(renderer->GetDevice(), imageViewDesc);
+            if (!m_diffuseImageView->Initialize())
+            {
+                DX_LOG(Fatal, "Object", "Failed to create diffuse image view.");
+                return;
+            }
         }
     }
 
