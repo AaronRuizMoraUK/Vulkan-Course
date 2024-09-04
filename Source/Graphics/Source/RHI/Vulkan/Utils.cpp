@@ -548,6 +548,52 @@ namespace Vulkan
         return vkBufferUsageFlags;
     }
 
+    VkFilter ToVkFilter(FilterSampling filter)
+    {
+        switch (filter)
+        {
+        case FilterSampling::Point:         return VK_FILTER_NEAREST;
+        case FilterSampling::Linear:        return VK_FILTER_LINEAR;
+        case FilterSampling::Anisotropic:   return VK_FILTER_LINEAR; // Anisotropic gets enabled in the sampler separately
+
+        case FilterSampling::Unknown:
+        default:
+            DX_LOG(Error, "Vulkan Utils", "Unknown filter sampling %d", filter);
+            return VK_FILTER_NEAREST;
+        }
+    }
+
+    VkSamplerMipmapMode ToVkSamplerMipmapMode(FilterSampling filter)
+    {
+        switch (filter)
+        {
+        case FilterSampling::Point:         return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        case FilterSampling::Linear:        return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        case FilterSampling::Anisotropic:   return VK_SAMPLER_MIPMAP_MODE_LINEAR; // Anisotropic gets enabled in the sampler separately
+
+        case FilterSampling::Unknown:
+        default:
+            DX_LOG(Error, "Vulkan Utils", "Unknown filter sampling %d", filter);
+            return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        }
+    }
+
+    VkSamplerAddressMode ToVkSamplerAddressMode(AddressMode addressMode)
+    {
+        switch (addressMode)
+        {
+        case AddressMode::Wrap:        return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        case AddressMode::Mirror:      return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+        case AddressMode::Clamp:       return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        case AddressMode::MirrorOnce:  return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+
+        case AddressMode::Unknown:
+        default:
+            DX_LOG(Error, "Vulkan Utils", "Unknown address mode %d", addressMode);
+            return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        }
+    }
+
     VkCommandBufferUsageFlags ToVkCommandBufferUsageFlags(CommandBufferUsageFlags flags)
     {
         VkCommandBufferUsageFlags vkCommandBufferUsageFlags = 0;

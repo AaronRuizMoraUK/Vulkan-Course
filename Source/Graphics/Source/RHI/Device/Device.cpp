@@ -135,8 +135,14 @@ namespace Vulkan
             //vkGetPhysicalDeviceProperties(vkPhysicalDevice, &vkPhysicalDeviceProperties);
 
             // Information about what the device can do (geometry shader, tessellation shaders, wide lines, etc.)
-            //VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures;
-            //vkGetPhysicalDeviceFeatures(vkPhysicalDevice, &vkPhysicalDeviceFeatures);
+            VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures;
+            vkGetPhysicalDeviceFeatures(vkPhysicalDevice, &vkPhysicalDeviceFeatures);
+
+            // Check device supports Anisotropy
+            if (!vkPhysicalDeviceFeatures.samplerAnisotropy)
+            {
+                return false;
+            }
 
             // Check device extensions support
             if (!VkDeviceExtensionsSupported(vkPhysicalDevice, extensions))
@@ -384,6 +390,7 @@ namespace Vulkan
 
         // Physical device features that the logical device will be using
         VkPhysicalDeviceFeatures vkPhysicalDeviceFeatures = {};
+        vkPhysicalDeviceFeatures.samplerAnisotropy = VK_TRUE; // Enable Anisotropy
 
         VkDeviceCreateInfo vkDeviceCreateInfo = {};
         vkDeviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

@@ -12,6 +12,7 @@ namespace Vulkan
     class Buffer;
     class Image;
     class ImageView;
+    class Sampler;
 }
 
 namespace DX
@@ -31,6 +32,7 @@ namespace DX
         std::shared_ptr<Vulkan::ImageView> GetDiffuseImageView() const;
         std::shared_ptr<Vulkan::ImageView> GetEmissiveImageView() const;
         std::shared_ptr<Vulkan::ImageView> GetNormalImageView() const;
+        std::shared_ptr<Vulkan::Sampler> GetSampler() const;
 
         std::shared_ptr<Vulkan::Buffer> GetVertexBuffer() const;
         std::shared_ptr<Vulkan::Buffer> GetIndexBuffer() const;
@@ -62,6 +64,7 @@ namespace DX
         std::shared_ptr<Vulkan::ImageView> m_diffuseImageView;
         std::shared_ptr<Vulkan::ImageView> m_emissiveImageView;
         std::shared_ptr<Vulkan::ImageView> m_normalImageView;
+        std::shared_ptr<Vulkan::Sampler> m_imageSampler;
     };
 
     class Cube : public Object

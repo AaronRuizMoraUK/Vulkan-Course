@@ -55,8 +55,6 @@ namespace Vulkan
 
     bool ImageView::CreateVkImageView()
     {
-        //VkImageAspectFlags vkAspectFlags,
-
         VkImageViewCreateInfo vkImageViewCreateInfo = {};
         vkImageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         vkImageViewCreateInfo.pNext = nullptr;

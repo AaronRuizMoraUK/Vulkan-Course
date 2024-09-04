@@ -4,6 +4,7 @@
 #include <RHI/Resource/Image/ImageEnums.h>
 #include <RHI/Resource/ImageView/ImageViewEnums.h>
 #include <RHI/Resource/Buffer/BufferEnums.h>
+#include <RHI/Sampler/SamplerEnums.h>
 #include <RHI/CommandBuffer/CommandBufferEnums.h>
 #include <RHI/Shader/ShaderEnums.h>
 
@@ -32,6 +33,12 @@ namespace Vulkan
     VkImageAspectFlags ToVkImageAspectFlags(ImageViewAspectFlags flags);
 
     VkBufferUsageFlags ToVkBufferUsageFlags(BufferUsageFlags flags);
+
+    VkFilter ToVkFilter(FilterSampling filter);
+
+    VkSamplerMipmapMode ToVkSamplerMipmapMode(FilterSampling filter);
+
+    VkSamplerAddressMode ToVkSamplerAddressMode(AddressMode addressMode);
 
     VkCommandBufferUsageFlags ToVkCommandBufferUsageFlags(CommandBufferUsageFlags flags);
 

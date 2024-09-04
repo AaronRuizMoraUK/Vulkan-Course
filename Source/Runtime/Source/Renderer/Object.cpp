@@ -7,6 +7,7 @@
 #include <RHI/Resource/Buffer/Buffer.h>
 #include <RHI/Resource/Image/Image.h>
 #include <RHI/Resource/ImageView/ImageView.h>
+#include <RHI/Sampler/Sampler.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
@@ -116,6 +117,122 @@ namespace DX
             if (!m_diffuseImageView->Initialize())
             {
                 DX_LOG(Fatal, "Object", "Failed to create diffuse image view.");
+                return;
+            }
+        }
+
+        // Emissive Texture
+        {
+            if (m_emissiveFilename.empty())
+            {
+                uint32_t imageData = 0; // 1 texel with all RGBA set to zero
+
+                Vulkan::ImageDesc imageDesc = {};
+                imageDesc.m_imageType = Vulkan::ImageType::Image2D;
+                imageDesc.m_dimensions = Math::Vector3Int(1, 1, 1);
+                imageDesc.m_mipCount = 1;
+                imageDesc.m_format = Vulkan::ResourceFormat::R8G8B8A8_UNORM;
+                imageDesc.m_tiling = Vulkan::ImageTiling::Optimal;
+                imageDesc.m_usageFlags = Vulkan::ImageUsage_Sampled;
+                imageDesc.m_initialData = &imageData;
+
+                m_emissiveImage = std::make_shared<Vulkan::Image>(renderer->GetDevice(), imageDesc);
+                if (!m_emissiveImage->Initialize())
+                {
+                    DX_LOG(Fatal, "Object", "Failed to create mock emissive image.");
+                    return;
+                }
+            }
+            else
+            {
+                auto textureAsset = TextureAsset::LoadTextureAsset(m_emissiveFilename);
+                DX_ASSERT(textureAsset.get(), "Object", "Failed to load texture");
+
+                Vulkan::ImageDesc imageDesc = {};
+                imageDesc.m_imageType = Vulkan::ImageType::Image2D;
+                imageDesc.m_dimensions = Math::Vector3Int(textureAsset->GetData()->m_size, 1);
+                imageDesc.m_mipCount = 1;
+                imageDesc.m_format = Vulkan::ResourceFormat::R8G8B8A8_UNORM;
+                imageDesc.m_tiling = Vulkan::ImageTiling::Optimal;
+                imageDesc.m_usageFlags = Vulkan::ImageUsage_Sampled;
+                imageDesc.m_initialData = textureAsset->GetData()->m_data;
+
+                m_emissiveImage = std::make_shared<Vulkan::Image>(renderer->GetDevice(), imageDesc);
+                if (!m_emissiveImage->Initialize())
+                {
+                    DX_LOG(Fatal, "Object", "Failed to create emissive image.");
+                    return;
+                }
+            }
+
+            Vulkan::ImageViewDesc imageViewDesc = {};
+            imageViewDesc.m_image = m_diffuseImage;
+            imageViewDesc.m_viewFormat = m_diffuseImage->GetImageDesc().m_format;
+            imageViewDesc.m_aspectFlags = Vulkan::ImageViewAspect_Color;
+            imageViewDesc.m_firstMip = 0;
+            imageViewDesc.m_mipCount = 0;
+
+            m_emissiveImageView = std::make_shared<Vulkan::ImageView>(renderer->GetDevice(), imageViewDesc);
+            if (!m_emissiveImageView->Initialize())
+            {
+                DX_LOG(Fatal, "Object", "Failed to create emissive image view.");
+                return;
+            }
+        }
+
+        // Normal Texture
+        {
+            auto textureAsset = TextureAsset::LoadTextureAsset(m_normalFilename);
+            DX_ASSERT(textureAsset.get(), "Object", "Failed to load texture");
+
+            Vulkan::ImageDesc imageDesc = {};
+            imageDesc.m_imageType = Vulkan::ImageType::Image2D;
+            imageDesc.m_dimensions = Math::Vector3Int(textureAsset->GetData()->m_size, 1);
+            imageDesc.m_mipCount = 1;
+            imageDesc.m_format = Vulkan::ResourceFormat::R8G8B8A8_UNORM;
+            imageDesc.m_tiling = Vulkan::ImageTiling::Optimal;
+            imageDesc.m_usageFlags = Vulkan::ImageUsage_Sampled;
+            imageDesc.m_initialData = textureAsset->GetData()->m_data;
+
+            m_normalImage = std::make_shared<Vulkan::Image>(renderer->GetDevice(), imageDesc);
+            if (!m_normalImage->Initialize())
+            {
+                DX_LOG(Fatal, "Object", "Failed to create normal image.");
+                return;
+            }
+
+            Vulkan::ImageViewDesc imageViewDesc = {};
+            imageViewDesc.m_image = m_diffuseImage;
+            imageViewDesc.m_viewFormat = m_diffuseImage->GetImageDesc().m_format;
+            imageViewDesc.m_aspectFlags = Vulkan::ImageViewAspect_Color;
+            imageViewDesc.m_firstMip = 0;
+            imageViewDesc.m_mipCount = 0;
+
+            m_normalImageView = std::make_shared<Vulkan::ImageView>(renderer->GetDevice(), imageViewDesc);
+            if (!m_normalImageView->Initialize())
+            {
+                DX_LOG(Fatal, "Object", "Failed to create normal image view.");
+                return;
+            }
+        }
+
+        // Sampler State
+        {
+            Vulkan::SamplerDesc samplerDesc = {};
+            samplerDesc.m_minFilter = Vulkan::FilterSampling::Linear;
+            samplerDesc.m_magFilter = Vulkan::FilterSampling::Linear;
+            samplerDesc.m_mipFilter = Vulkan::FilterSampling::Linear;
+            samplerDesc.m_addressU = Vulkan::AddressMode::Wrap;
+            samplerDesc.m_addressV = Vulkan::AddressMode::Wrap;
+            samplerDesc.m_addressW = Vulkan::AddressMode::Wrap;
+            samplerDesc.m_mipBias = 0.0f;
+            samplerDesc.m_mipClamp = Vulkan::NoMipClamping;
+            samplerDesc.m_maxAnisotropy = 1.0f;
+
+            m_imageSampler = std::make_shared<Vulkan::Sampler>(renderer->GetDevice(), samplerDesc);
+            if (!m_imageSampler->Initialize())
+            {
+                DX_LOG(Fatal, "Object", "Failed to create image sampler.");
                 return;
             }
         }

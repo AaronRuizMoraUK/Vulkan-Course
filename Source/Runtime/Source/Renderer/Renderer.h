@@ -147,17 +147,20 @@ namespace DX
         // ---------------------------
         // Per Frame data
         // 
+        // We need data for each frame so they won't stumble into each other
+        // while drawing the independent frames. They might have different content per frame.
+        // 
         // TODO: Move out of renderer to a new class.
         bool CreateFrameData();
 
         // Command buffers for sending commands to each swap chain frame buffer.
         std::vector<std::unique_ptr<Vulkan::CommandBuffer>> m_commandBuffers;
 
-        // We need uniform buffers for each frame so they won't stumble into each other
-        // while drawing the independent frames. They might have different content per frame.
+        // Per Scene resources
         std::vector<std::unique_ptr<Vulkan::Buffer>> m_viewProjUniformBuffers;
-        // We need pipeline descriptor sets for each frame so they won't stumble into each other
-        // while drawing the independent frames. They might have different content per frame.
         std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perSceneDescritorSets;
+
+        // Per Object resources
+        std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perObjectDescritorSets;
     };
 } // namespace DX
