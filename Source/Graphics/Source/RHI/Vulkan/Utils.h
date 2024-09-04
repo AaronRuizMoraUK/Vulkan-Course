@@ -2,6 +2,7 @@
 
 #include <RHI/Resource/ResourceEnums.h>
 #include <RHI/Resource/Image/ImageEnums.h>
+#include <RHI/Resource/ImageView/ImageViewEnums.h>
 #include <RHI/Resource/Buffer/BufferEnums.h>
 #include <RHI/CommandBuffer/CommandBufferEnums.h>
 #include <RHI/Shader/ShaderEnums.h>
@@ -27,6 +28,8 @@ namespace Vulkan
     VkImageTiling ToVkImageTiling(ImageTiling imageTiling);
 
     VkImageUsageFlags ToVkImageUsageFlags(ImageUsageFlags flags);
+
+    VkImageAspectFlags ToVkImageAspectFlags(ImageViewAspectFlags flags);
 
     VkBufferUsageFlags ToVkBufferUsageFlags(BufferUsageFlags flags);
 

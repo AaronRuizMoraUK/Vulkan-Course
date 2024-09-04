@@ -4,12 +4,15 @@
 
 #include <Math/Vector2.h>
 
+#include <vector>
+
 typedef struct VkFramebuffer_T* VkFramebuffer;
 typedef struct VkImageView_T* VkImageView;
 
 namespace Vulkan
 {
     class Device;
+    class ImageView;
 
     // Manages the Vulkan Frame Buffer
     class FrameBuffer
@@ -40,8 +43,8 @@ namespace Vulkan
 
         Math::Vector2Int m_dimensions;
 
-        std::vector<VkImageView> m_vkColorImageViews;
-        VkImageView m_vkDepthStencilImageView = nullptr;
+        std::vector<std::unique_ptr<ImageView>> m_colorImageViews;
+        std::unique_ptr<ImageView> m_depthStencilImageView = nullptr;
 
         VkFramebuffer m_vkFrameBuffer = nullptr;
     };

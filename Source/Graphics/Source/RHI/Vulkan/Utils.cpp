@@ -524,6 +524,17 @@ namespace Vulkan
         return vkImageUsageFlags;
     }
 
+    VkImageAspectFlags ToVkImageAspectFlags(ImageViewAspectFlags flags)
+    {
+        VkImageAspectFlags vkImageAspectFlags = 0;
+
+        vkImageAspectFlags |= (flags & ImageViewAspect_Color) ? VK_IMAGE_ASPECT_COLOR_BIT : 0;
+        vkImageAspectFlags |= (flags & ImageViewAspect_Depth) ? VK_IMAGE_ASPECT_DEPTH_BIT : 0;
+        vkImageAspectFlags |= (flags & ImageViewAspect_Stencil) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0;
+
+        return vkImageAspectFlags;
+    }
+
     VkBufferUsageFlags ToVkBufferUsageFlags(BufferUsageFlags flags)
     {
         VkBufferUsageFlags vkBufferUsageFlags = 0;
