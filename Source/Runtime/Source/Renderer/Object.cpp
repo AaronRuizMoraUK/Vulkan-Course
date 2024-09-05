@@ -335,6 +335,13 @@ namespace DX
             { Math::Vector3Packed({-half.x, -half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 0.0f}) },
         };
 
+        // Flip UVs and calculate binormals
+        for (auto& vertex : m_vertexData)
+        {
+            vertex.m_uv.y = -vertex.m_uv.y;
+            vertex.m_binormal = Math::Vector3::CrossProduct(Math::Vector3(vertex.m_tangent), Math::Vector3(vertex.m_normal));
+        }
+
         m_indexData =
         {
             // Front face
