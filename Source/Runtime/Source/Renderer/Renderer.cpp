@@ -323,7 +323,7 @@ namespace DX
                     .m_inverseTransposeWorldMatrix = object->GetTransform().ToMatrix().Inverse().Transpose()
                 };
                 commandBuffer->PushConstantsToPipeline(
-                    m_pipeline.get(), Vulkan::ShaderType_Vertex, &worldBuffer, sizeof(worldBuffer));
+                    m_pipeline.get(), Vulkan::ShaderType_Vertex | Vulkan::ShaderType_Fragment, &worldBuffer, sizeof(worldBuffer));
 
                 // Bind Vertex and Index Buffers
                 commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });

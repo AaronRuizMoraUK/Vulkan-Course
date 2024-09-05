@@ -605,22 +605,18 @@ namespace Vulkan
         return vkCommandBufferUsageFlags;
     }
 
-    VkShaderStageFlags ToVkShaderStageFlags(ShaderType shaderType)
+    VkShaderStageFlags ToVkShaderStageFlags(ShaderTypeFlags flags)
     {
-        switch (shaderType)
-        {
-        case ShaderType_Vertex:                return VK_SHADER_STAGE_VERTEX_BIT;
-        case ShaderType_TesselationControl:    return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
-        case ShaderType_TesselationEvaluation: return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
-        case ShaderType_Geometry:              return VK_SHADER_STAGE_GEOMETRY_BIT;
-        case ShaderType_Fragment:              return VK_SHADER_STAGE_FRAGMENT_BIT;
-        case ShaderType_Compute:               return VK_SHADER_STAGE_COMPUTE_BIT;
+        VkShaderStageFlags vkShaderStageFlags = 0;
 
-        case ShaderType_Unknown:
-        default:
-            DX_LOG(Fatal, "Vulkan Utils", "Unknown shader type %d", shaderType);
-            return 0;
-        }
+        vkShaderStageFlags |= (flags & ShaderType_Vertex) ? VK_SHADER_STAGE_VERTEX_BIT : 0;
+        vkShaderStageFlags |= (flags & ShaderType_TesselationControl) ? VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT : 0;
+        vkShaderStageFlags |= (flags & ShaderType_TesselationEvaluation) ? VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT : 0;
+        vkShaderStageFlags |= (flags & ShaderType_Geometry) ? VK_SHADER_STAGE_GEOMETRY_BIT : 0;
+        vkShaderStageFlags |= (flags & ShaderType_Fragment) ? VK_SHADER_STAGE_FRAGMENT_BIT : 0;
+        vkShaderStageFlags |= (flags & ShaderType_Compute) ? VK_SHADER_STAGE_COMPUTE_BIT : 0;
+
+        return vkShaderStageFlags;
     }
 
 } // namespace Vulkan

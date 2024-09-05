@@ -56,7 +56,22 @@ namespace Math
     // Column2 (AxisZ,0)
     // Column3 (Pos,1)
     // 
-    // HLSL matrices (float4x4) are also column major by default.
+    // Assuming we want to continue using column major transformation order in the shaders,
+    // here is the treatment for each shading language:
+    // 
+    // HLSL matrices (float3x3 and float4x4) for uniform parameters are column major by default, 
+    // but matrices constructed in shader passing vector generates row-major matrices, this means:
+    // - The matrices we pass from CPU are in column major as expected by the shader, therefore the shader
+    //   must use column major transformation order: TransformedPoint = TransformMatrix * Point
+    // - The matrices created in shader itself from vectors (axis X,Y,Z) will need to be transposed
+    //   because in HLSL the matrix constructor takes rows as inputs, not columns.
+    //
+    // GLSL matrices (mat3 and mat4) for uniform parameters are column major by default and
+    // matrices constructed in shader are column-major too, this means:
+    // - The matrices we pass from CPU are in column major as expected by the shader and therefore the shader
+    //   must use column major transformation order: TransformedPoint = TransformMatrix * Point
+    // - The matrices created in shader itself from vectors (axis X,Y,Z) will be correctly stored
+    //   as columns because in GLSL the matrix constructor takes columns as inputs.
 
     using Matrix4x4 = mathfu::Matrix<float, 4, 4>;
 

@@ -208,11 +208,11 @@ namespace Vulkan
     }
 
     void CommandBuffer::PushConstantsToPipeline(
-        [[maybe_unused]] Pipeline* pipeline, 
-        [[maybe_unused]] ShaderType shaderType, 
-        [[maybe_unused]] const void* data, 
-        [[maybe_unused]] uint32_t dataSize, 
-        [[maybe_unused]] uint32_t offset)
+        Pipeline* pipeline, 
+        ShaderTypeFlags shaderTypes,
+        const void* data, 
+        uint32_t dataSize, 
+        uint32_t offset)
     {
         // Max size is 128 bytes
         if (dataSize > PushConstantsMaxSize)
@@ -225,7 +225,7 @@ namespace Vulkan
 
         vkCmdPushConstants(m_vkCommandBuffer, 
             pipeline->GetVkPipelineLayout(), 
-            ToVkShaderStageFlags(shaderType),
+            ToVkShaderStageFlags(shaderTypes),
             offset,
             dataSize,
             data);

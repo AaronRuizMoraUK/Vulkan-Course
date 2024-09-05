@@ -263,9 +263,9 @@ namespace Vulkan
 
         // Push Constant Ranges. Maximum of 1 per shader.
         const std::vector<VkPushConstantRange> vkPushConstantRanges = {
-            // Per Object World Binding Info in Vertex Shader
+            // Per Object World Binding Info in Vertex and Fragment Shader
             {
-                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                 .offset = 0,
                 .size = 2 * sizeof(Math::Matrix4x4Packed) // Max size 128 bytes. It fits 2 matrices.
             }
@@ -392,13 +392,16 @@ namespace Vulkan
             // Pipeline Vertex Input State (Input Layout)
             const VkVertexInputBindingDescription vkVertexInputBindingDesc = {
                 .binding = 0, // Stream
-                .stride = (3 + 2) * 4, // sizeof(VertexPUv)
+                .stride = (3 + 3 + 3 + 3 + 2) * 4, // sizeof(VertexPNTBUv)
                 .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
             };
 
             const std::vector<VkVertexInputAttributeDescription> vkVertexInputAttributesDesc = {
-                { .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},
-                { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = (3) * 4 /*offsetof(VertexPUv, m_uv)*/ },
+                {.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = 0},
+                {.location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = (3) * 4 /*offsetof(VertexPNTBUv, m_normal)*/},
+                {.location = 2, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = (3 + 3) * 4 /*offsetof(VertexPNTBUv, m_tangent)*/},
+                {.location = 3, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = (3 + 3 + 3) * 4 /*offsetof(VertexPNTBUv, m_binormal)*/},
+                {.location = 4, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = (3 + 3 + 3 + 3) * 4 /*offsetof(VertexPNTBUv, m_uv)*/},
             };
 
             VkPipelineVertexInputStateCreateInfo vkPipelineVertexInputStateCreateInfo = {};

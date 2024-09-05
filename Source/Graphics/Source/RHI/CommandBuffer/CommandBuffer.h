@@ -70,7 +70,7 @@ namespace Vulkan
 
         void BindPipelineDescriptorSet(PipelineDescriptorSet* descriptorSet);
         void BindPipelineDescriptorSet(PipelineDescriptorSet* descriptorSet, const std::vector<uint32_t>& dynamicOffsetsInBytes);
-        void PushConstantsToPipeline(Pipeline* pipeline, ShaderType shaderType, const void* data, uint32_t dataSize, uint32_t offset = 0);
+        void PushConstantsToPipeline(Pipeline* pipeline, ShaderTypeFlags shaderTypes, const void* data, uint32_t dataSize, uint32_t offset = 0);
 
         void BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers);
         void BindIndexBuffer(Buffer* indexBuffer);

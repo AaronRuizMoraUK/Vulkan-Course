@@ -299,40 +299,40 @@ namespace DX
         m_vertexData =
         {
             // Front face
-            { Math::Vector3Packed({-half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Back face
-            { Math::Vector3Packed({ half.x, -half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x, -half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Right face
-            { Math::Vector3Packed({ half.x, -half.y, -half.z}), /*Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y, -half.z}), /*Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x, -half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y, -half.z}), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y, -half.z}), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Left face
-            { Math::Vector3Packed({-half.x, -half.y,  half.z}), /*Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y,  half.z}), /*Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Top face
-            { Math::Vector3Packed({-half.x,  half.y, -half.z}), /*Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({-half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y,  half.z}), /*Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({ half.x,  half.y, -half.z}), /*Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y, -half.z}), Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({-half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y,  half.z}), Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({ half.x,  half.y, -half.z}), Math::Vector3Packed(mathfu::kAxisY3f), Math::Vector3Packed(mathfu::kAxisX3f), Math::Vector3Packed(-mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 0.0f}) },
 
             // Bottom face
-            { Math::Vector3Packed({ half.x, -half.y,  half.z}), /*Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f),*/ Math::Vector2Packed({0.0f, 0.0f}) },
-            { Math::Vector3Packed({ half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f),*/ Math::Vector2Packed({0.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x, -half.y, -half.z}), /*Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f),*/ Math::Vector2Packed({1.0f, 1.0f}) },
-            { Math::Vector3Packed({-half.x, -half.y,  half.z}), /*Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f),*/ Math::Vector2Packed({1.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({0.0f, 0.0f}) },
+            { Math::Vector3Packed({ half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({0.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y, -half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 1.0f}) },
+            { Math::Vector3Packed({-half.x, -half.y,  half.z}), Math::Vector3Packed(-mathfu::kAxisY3f), Math::Vector3Packed(-mathfu::kAxisX3f), Math::Vector3Packed(mathfu::kAxisZ3f), Math::Vector2Packed({1.0f, 0.0f}) },
         };
 
         m_indexData =
@@ -388,12 +388,12 @@ namespace DX
         m_vertexData.resize(meshData->m_positions.size());
         for (uint32_t i = 0; i < meshData->m_positions.size(); ++i)
         {
-            m_vertexData[i] = VertexPUv
+            m_vertexData[i] = VertexPNTBUv
             {
                 .m_position = meshData->m_positions[i],
-                //.m_normal = meshData->m_normals[i],
-                //.m_tangent = meshData->m_tangents[i],
-                //.m_binormal = meshData->m_binormals[i],
+                .m_normal = meshData->m_normals[i],
+                .m_tangent = meshData->m_tangents[i],
+                .m_binormal = meshData->m_binormals[i],
                 .m_uv = meshData->m_textCoords[i]
             };
         }

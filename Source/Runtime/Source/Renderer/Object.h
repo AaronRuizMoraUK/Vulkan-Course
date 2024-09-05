@@ -40,13 +40,13 @@ namespace DX
     protected:
         void CreateBuffers();
 
-        uint32_t GetVertexSize() const { return sizeof(VertexPUv); }
+        uint32_t GetVertexSize() const { return sizeof(VertexPNTBUv); }
         uint32_t GetIndexSize() const { return sizeof(Index); }
 
         Math::Transform m_transform = Math::Transform::CreateIdentity();
 
         // Filled by subclass
-        std::vector<VertexPUv> m_vertexData;
+        std::vector<VertexPNTBUv> m_vertexData;
         std::vector<Index> m_indexData;
 
         // Filled by subclass

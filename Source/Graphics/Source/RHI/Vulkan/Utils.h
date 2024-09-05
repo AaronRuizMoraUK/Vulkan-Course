@@ -42,6 +42,6 @@ namespace Vulkan
 
     VkCommandBufferUsageFlags ToVkCommandBufferUsageFlags(CommandBufferUsageFlags flags);
 
-    VkShaderStageFlags ToVkShaderStageFlags(ShaderType shaderType);
+    VkShaderStageFlags ToVkShaderStageFlags(ShaderTypeFlags flags);
 
 } // namespace Vulkan
