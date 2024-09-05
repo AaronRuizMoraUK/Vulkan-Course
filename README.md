@@ -2,9 +2,9 @@
 
 <img src="./Vulkan-logo.png">
 
-***- Vulkan Course in progress -***
-
 Project generated while doing the Udemy course *[Learn the Vulkan API with C++](https://www.udemy.com/course/learn-the-vulkan-api-with-cpp/)* by Ben Cook.
+
+This branch contains all the code generated up to *Lecture 28: Model Loading* where we can load and render several models with different textures.
 
 Special emphasis has been placed on modularity, separating the Vulkan code into its own library. All the different graphics concepts have been encapsulated in different classes, making easy to read and understand, see [Rendering Engine Architecture](#Rendering-Engine-Architecture) section for more details. Also, additional improvements have been added on top of the course content (see [Vulkan Course Improvements](#Vulkan-Course-Improvements) section).
 
