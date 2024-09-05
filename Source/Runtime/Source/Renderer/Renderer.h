@@ -154,13 +154,14 @@ namespace DX
         bool CreateFrameData();
 
         // Command buffers for sending commands to each swap chain frame buffer.
-        std::vector<std::unique_ptr<Vulkan::CommandBuffer>> m_commandBuffers;
+        std::vector<std::unique_ptr<Vulkan::CommandBuffer>> m_commandBuffers; // One per frame
 
         // Per Scene resources
-        std::vector<std::unique_ptr<Vulkan::Buffer>> m_viewProjUniformBuffers;
-        std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perSceneDescritorSets;
+        std::vector<std::unique_ptr<Vulkan::Buffer>> m_viewProjUniformBuffers; // One per frame
+        std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perSceneDescritorSets; // One per frame
 
         // Per Object resources
-        std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perObjectDescritorSets;
+        using PipelineDescriptorSetsForObjects = std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>>; // MaxObjects elements
+        std::vector<PipelineDescriptorSetsForObjects> m_perObjectDescritorSets; // One per frame
     };
 } // namespace DX

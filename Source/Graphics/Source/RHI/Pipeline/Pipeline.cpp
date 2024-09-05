@@ -149,19 +149,25 @@ namespace Vulkan
     {
         if (setLayoutIndex < m_descriptorSetLayouts.size())
         {
-            return std::make_shared<PipelineDescriptorSet>(
+            auto descriptorSet = std::make_shared<PipelineDescriptorSet>(
                 m_device, m_device->GetVkDescriptorPool(), this, setLayoutIndex);
+
+            if (descriptorSet->Initialize())
+            {
+                return descriptorSet;
+            }
         }
-        else
-        {
-            return nullptr;
-        }
+        return nullptr;
     }
 
     bool Pipeline::CreateVkPipelineLayout()
     {
-        // Descriptor Sets Layout
         // TODO: Obtain this from the shaders.
+
+        // Reset the descriptor set layouts
+        m_descriptorSetLayouts.clear();
+
+        // Descriptor Sets Layout 0: Per Scene resources
         {
             const std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
                 // ViewProj Binding Info
@@ -193,14 +199,71 @@ namespace Vulkan
                 return false;
             }
 
-            m_descriptorSetLayouts.clear();
             m_descriptorSetLayouts.push_back(std::move(descriptorSetLayout));
         }
 
-        // Push Constant Ranges
-        // TODO: Obtain this from the shaders.
+        // Descriptor Sets Layout 1: Per Object resources
+        {
+            const std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
+                // Sampler Binding Info
+                {
+                    .binding = 0,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER,
+                    .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, // Shader stage to bind to
+                    .pImmutableSamplers = nullptr
+                },
+                // Diffuse texture Binding Info
+                {
+                    .binding = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                    .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, // Shader stage to bind to
+                    .pImmutableSamplers = nullptr
+                },
+                // Emissive texture Binding Info
+                {
+                    .binding = 2,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                    .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, // Shader stage to bind to
+                    .pImmutableSamplers = nullptr
+                },
+                // Normal texture Binding Info
+                {
+                    .binding = 3,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                    .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, // Shader stage to bind to
+                    .pImmutableSamplers = nullptr
+                }
+            };
+
+            auto descriptorSetLayout = std::make_unique<DescriptorSetLayout>();
+
+            descriptorSetLayout->m_numDynamicDescriptors = Utils::GetDynamicDescritorCount(descriptorSetLayoutBindings);
+
+            // Create Descriptor Set Layout with given bindings
+            VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
+            vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+            vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
+            vkDescriptorSetLayoutCreateInfo.flags = 0;
+            vkDescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
+            vkDescriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
+
+            if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(),
+                &vkDescriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout->m_vkDescriptorSetLayout) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
+                return false;
+            }
+
+            m_descriptorSetLayouts.push_back(std::move(descriptorSetLayout));
+        }
+
+        // Push Constant Ranges. Maximum of 1 per shader.
         const std::vector<VkPushConstantRange> vkPushConstantRanges = {
-            // World Binding Info
+            // Per Object World Binding Info in Vertex Shader
             {
                 .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
                 .offset = 0,
@@ -208,7 +271,7 @@ namespace Vulkan
             }
         };
 
-        // Pipeline Layout
+        // Pipeline Layout = Descriptor set layouts + Push constant ranges
         {
             std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts(m_descriptorSetLayouts.size(), nullptr);
             std::transform(m_descriptorSetLayouts.begin(), m_descriptorSetLayouts.end(), vkDescriptorSetLayouts.begin(),

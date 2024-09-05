@@ -11,6 +11,8 @@ namespace Vulkan
     class Device;
     class Pipeline;
     class Buffer;
+    class ImageView;
+    class Sampler;
     struct DescriptorSetLayout;
 
     // Manages a Pipeline Descriptor Set
@@ -38,6 +40,8 @@ namespace Vulkan
         // Set resources using layout binding index inside the descriptor set layout.
         void SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer);
         void SetUniformBufferDynamic(uint32_t layoutBinding, Buffer* buffer);
+        void SetImageView(uint32_t layoutBinding, ImageView* imageView);
+        void SetSampler(uint32_t layoutBinding, Sampler* sampler);
 
     private:
         Device* m_device = nullptr;

@@ -2,10 +2,10 @@
 
 // Vertex Inputs
 layout(location = 0) in vec3 vertexInPosition;
-layout(location = 1) in vec4 vertexInColor;
+layout(location = 1) in vec2 vertexInUV;
 
 // Vertex Outputs
-layout(location = 0) out vec4 vertexOutColor;
+layout(location = 0) out vec2 vertexOutUV;
 
 layout(set = 0, binding = 0) uniform ViewProjBuffer
 {
@@ -23,5 +23,5 @@ layout(push_constant) uniform WorldBuffer
 void main()
 {
     gl_Position = viewProjBuffer.projMatrix * viewProjBuffer.viewMatrix * worldBuffer.worldMatrix * vec4(vertexInPosition, 1.0);
-    vertexOutColor = vertexInColor;
+    vertexOutUV = vertexInUV;
 }

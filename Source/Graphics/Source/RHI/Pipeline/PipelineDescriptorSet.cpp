@@ -2,6 +2,9 @@
 
 #include <RHI/Device/Device.h>
 #include <RHI/Resource/Buffer/Buffer.h>
+#include <RHI/Resource/Image/Image.h>
+#include <RHI/Resource/ImageView/ImageView.h>
+#include <RHI/Sampler/Sampler.h>
 #include <RHI/Pipeline/Pipeline.h>
 
 #include <Log/Log.h>
@@ -36,7 +39,7 @@ namespace Vulkan
             return true; // Already initialized
         }
 
-        DX_LOG(Info, "Vulkan PipelineDescriptorSet", "Initializing PipelineDescriptorSet...");
+        //DX_LOG(Info, "Vulkan PipelineDescriptorSet", "Initializing PipelineDescriptorSet...");
 
         if (!CreateVkDescriptorSet())
         {
@@ -49,7 +52,7 @@ namespace Vulkan
 
     void PipelineDescriptorSet::Terminate()
     {
-        DX_LOG(Info, "Vulkan PipelineDescriptorSet", "Terminating PipelineDescriptorSet...");
+        //DX_LOG(Info, "Vulkan PipelineDescriptorSet", "Terminating PipelineDescriptorSet...");
 
         vkFreeDescriptorSets(m_device->GetVkDevice(), m_vkDescriptorPool, 1, &m_vkDescriptorSet);
         m_vkDescriptorSet = nullptr;
@@ -134,6 +137,70 @@ namespace Vulkan
         vkWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
         vkWriteDescriptorSet.pImageInfo = nullptr;
         vkWriteDescriptorSet.pBufferInfo = &vkDescriptorBufferInfo;
+        vkWriteDescriptorSet.pTexelBufferView = nullptr;
+
+        vkUpdateDescriptorSets(m_device->GetVkDevice(),
+            1, &vkWriteDescriptorSet,
+            0, nullptr); // For copying descriptor sets to other descriptor sets
+    }
+
+    void PipelineDescriptorSet::SetImageView(uint32_t layoutBinding, ImageView* imageView)
+    {
+        // TODO: Once bindings are included in Descriptor Set Layout, this could validate
+        //       that the layoutBinding is expecting an image view.
+
+        // Descriptor for the image (aka a Image View)
+        const VkDescriptorImageInfo vkDescriptorImageInfo = {
+            .sampler = nullptr,
+            .imageView = imageView->GetVkImageView(),
+            .imageLayout = static_cast<VkImageLayout>(imageView->GetImageDesc().m_image->GetVkImageLayout())
+        };
+
+        VkWriteDescriptorSet vkWriteDescriptorSet = {};
+        vkWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vkWriteDescriptorSet.pNext = nullptr;
+        vkWriteDescriptorSet.dstSet = m_vkDescriptorSet;
+        // Binding index from VkDescriptorSetLayoutCreateInfo.pBindings list.
+        // This is not the "binding" attribute from the shader, that's specified
+        // inside each element of the list.
+        vkWriteDescriptorSet.dstBinding = layoutBinding;
+        vkWriteDescriptorSet.dstArrayElement = 0; // If layout binding contains an array, index in array to update.
+        vkWriteDescriptorSet.descriptorCount = 1; // How many descriptors (elements in pImageInfo) we are setting.
+        vkWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        vkWriteDescriptorSet.pImageInfo = &vkDescriptorImageInfo;
+        vkWriteDescriptorSet.pBufferInfo = nullptr;
+        vkWriteDescriptorSet.pTexelBufferView = nullptr;
+
+        vkUpdateDescriptorSets(m_device->GetVkDevice(),
+            1, &vkWriteDescriptorSet,
+            0, nullptr); // For copying descriptor sets to other descriptor sets
+    }
+
+    void PipelineDescriptorSet::SetSampler(uint32_t layoutBinding, Sampler* sampler)
+    {
+        // TODO: Once bindings are included in Descriptor Set Layout, this could validate
+        //       that the layoutBinding is expecting a sampler.
+
+        // Descriptor for the sampler
+        const VkDescriptorImageInfo vkDescriptorImageInfo = {
+            .sampler = sampler->GetVkSampler(),
+            .imageView = nullptr,
+            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED
+        };
+
+        VkWriteDescriptorSet vkWriteDescriptorSet = {};
+        vkWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vkWriteDescriptorSet.pNext = nullptr;
+        vkWriteDescriptorSet.dstSet = m_vkDescriptorSet;
+        // Binding index from VkDescriptorSetLayoutCreateInfo.pBindings list.
+        // This is not the "binding" attribute from the shader, that's specified
+        // inside each element of the list.
+        vkWriteDescriptorSet.dstBinding = layoutBinding;
+        vkWriteDescriptorSet.dstArrayElement = 0; // If layout binding contains an array, index in array to update.
+        vkWriteDescriptorSet.descriptorCount = 1; // How many descriptors (elements in pImageInfo) we are setting.
+        vkWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        vkWriteDescriptorSet.pImageInfo = &vkDescriptorImageInfo;
+        vkWriteDescriptorSet.pBufferInfo = nullptr;
         vkWriteDescriptorSet.pTexelBufferView = nullptr;
 
         vkUpdateDescriptorSets(m_device->GetVkDevice(),

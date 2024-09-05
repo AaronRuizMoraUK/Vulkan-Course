@@ -97,6 +97,7 @@ namespace DX
 
         DX_LOG(Info, "Renderer", "Terminating Renderer...");
 
+        m_perObjectDescritorSets.clear();
         m_perSceneDescritorSets.clear();
         m_viewProjUniformBuffers.clear();
         m_commandBuffers.clear();
@@ -263,6 +264,18 @@ namespace DX
             Math::Vector4{ m_camera->GetTransform().m_position, 1.0f }
         );
         m_viewProjUniformBuffers[m_currentFrame]->UpdateBufferData(&viewProjBuffer, sizeof(viewProjBuffer));
+
+        // Update per object pipeline descriptor set
+        for (uint32_t objectIndex = 0;
+            auto * object : m_objects)
+        {
+            Vulkan::PipelineDescriptorSet* objectDescriptorSet = m_perObjectDescritorSets[m_currentFrame][objectIndex].get();
+
+            objectDescriptorSet->SetSampler(0, object->GetSampler().get());
+            objectDescriptorSet->SetImageView(1, object->GetDiffuseImageView().get());
+            objectDescriptorSet->SetImageView(2, object->GetEmissiveImageView().get());
+            objectDescriptorSet->SetImageView(3, object->GetNormalImageView().get());
+        }
     }
 
     void Renderer::RecordCommands(Vulkan::FrameBuffer* frameBuffer)
@@ -299,6 +312,9 @@ namespace DX
             for (uint32_t objectIndex = 0;
                 auto* object : m_objects)
             {
+                // Bind per object pipeline descriptor set, which includes the images and sampler.
+                commandBuffer->BindPipelineDescriptorSet(m_perObjectDescritorSets[m_currentFrame][objectIndex].get());
+
                 // Push per object World data to the pipeline.
                 const WorldBuffer worldBuffer = {
                     .m_worldMatrix = object->GetTransform().ToMatrix(),
@@ -460,6 +476,11 @@ namespace DX
         m_commandBuffers.resize(Vulkan::MaxFrameDraws);
         m_viewProjUniformBuffers.resize(Vulkan::MaxFrameDraws);
         m_perSceneDescritorSets.resize(Vulkan::MaxFrameDraws);
+        m_perObjectDescritorSets.resize(Vulkan::MaxFrameDraws);
+
+        constexpr uint32_t descriptorSetIndexForPerSceneResources = 0;
+        constexpr uint32_t descriptorSetIndexForPerObjectResources = 1;
+
 
         for (int i = 0; i < Vulkan::MaxFrameDraws; ++i)
         {
@@ -471,22 +492,40 @@ namespace DX
                 return false;
             }
 
-            m_viewProjUniformBuffers[i] = std::make_unique<Vulkan::Buffer>(m_device.get(), viewProjBufferDesc);
-            if (!m_viewProjUniformBuffers[i]->Initialize())
+            // Per Scene resources
             {
-                DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
-                return false;
+                m_viewProjUniformBuffers[i] = std::make_unique<Vulkan::Buffer>(m_device.get(), viewProjBufferDesc);
+                if (!m_viewProjUniformBuffers[i]->Initialize())
+                {
+                    DX_LOG(Error, "Renderer", "Failed to create uniform buffer for ViewProj data.");
+                    return false;
+                }
+
+                m_perSceneDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet(descriptorSetIndexForPerSceneResources);
+                if (!m_perSceneDescritorSets[i])
+                {
+                    return false;
+                }
+
+                // Fill the Pipeline Descriptor Sets with the Uniform Buffers
+                // ViewProj uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
+                m_perSceneDescritorSets[i]->SetUniformBuffer(0, m_viewProjUniformBuffers[i].get());
             }
 
-            m_perSceneDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet(0);
-            if (!m_perSceneDescritorSets[i]->Initialize())
+            // Per Object resources
             {
-                return false;
-            }
+                m_perObjectDescritorSets[i].resize(Vulkan::MaxObjects);
+                for (int objectIndex = 0; objectIndex < Vulkan::MaxObjects; ++objectIndex)
+                {
+                    m_perObjectDescritorSets[i][objectIndex] = m_pipeline->CreatePipelineDescriptorSet(descriptorSetIndexForPerObjectResources);
+                    if (!m_perObjectDescritorSets[i][objectIndex])
+                    {
+                        return false;
+                    }
+                }
 
-            // Fill the Pipeline Descriptor Sets with the Uniform Buffers
-            // ViewProj uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
-            m_perSceneDescritorSets[i]->SetUniformBuffer(0, m_viewProjUniformBuffers[i].get());
+                // Per object descriptor sets will be filled with data every frame
+            }
         }
 
         return true;

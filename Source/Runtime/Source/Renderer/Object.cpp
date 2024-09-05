@@ -36,6 +36,11 @@ namespace DX
         return m_normalImageView;
     }
 
+    std::shared_ptr<Vulkan::Sampler> Object::GetSampler() const
+    {
+        return m_imageSampler;
+    }
+
     std::shared_ptr<Vulkan::Buffer> Object::GetVertexBuffer() const
     {
         return m_vertexBuffer;

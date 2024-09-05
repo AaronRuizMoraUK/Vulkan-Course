@@ -275,6 +275,11 @@ namespace Vulkan
         return m_vkImage;
     }
 
+    int Image::GetVkImageLayout() const
+    {
+        return m_vkImageLayout;
+    }
+
     uint32_t Image::CalculateImageMemorySize() const
     {
         uint32_t totalSize = 0;
@@ -404,6 +409,7 @@ namespace Vulkan
                 {
                     return false;
                 }
+                m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             }
             else if (m_desc.m_usageFlags & ImageUsage_Storage)
             {
@@ -418,6 +424,7 @@ namespace Vulkan
                 {
                     return false;
                 }
+                m_vkImageLayout = VK_IMAGE_LAYOUT_GENERAL;
             }
             else if (m_desc.m_usageFlags & ImageUsage_ColorAttachment)
             {
@@ -466,14 +473,17 @@ namespace Vulkan
                 {
                     return false;
                 }
+                m_vkImageLayout = VK_IMAGE_LAYOUT_GENERAL;
             }
             else if (m_desc.m_usageFlags & ImageUsage_ColorAttachment)
             {
                 // Leave the layout as VK_IMAGE_LAYOUT_UNDEFINED and Render Pass will handle the transitions
+                m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             }
             else if (m_desc.m_usageFlags & ImageUsage_DepthStencilAttachment)
             {
                 // Leave the layout as VK_IMAGE_LAYOUT_UNDEFINED and Render Pass will handle the transitions
+                m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             }
         }
 

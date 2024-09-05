@@ -26,6 +26,8 @@ namespace Vulkan
 
         VkImage GetVkImage();
 
+        int GetVkImageLayout() const;
+
     private:
         Device* m_device = nullptr;
         ImageDesc m_desc;
@@ -36,5 +38,7 @@ namespace Vulkan
 
         VkImage m_vkImage = nullptr;
         VkDeviceMemory m_vkImageMemory = nullptr;
+
+        int m_vkImageLayout = 0;
     };
 } // namespace Vulkan
