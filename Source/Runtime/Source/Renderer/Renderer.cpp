@@ -275,6 +275,8 @@ namespace DX
             objectDescriptorSet->SetImageView(1, object->GetDiffuseImageView().get());
             objectDescriptorSet->SetImageView(2, object->GetEmissiveImageView().get());
             objectDescriptorSet->SetImageView(3, object->GetNormalImageView().get());
+
+            ++objectIndex;
         }
     }
 

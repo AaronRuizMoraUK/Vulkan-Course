@@ -171,8 +171,8 @@ namespace DX
             }
 
             Vulkan::ImageViewDesc imageViewDesc = {};
-            imageViewDesc.m_image = m_diffuseImage;
-            imageViewDesc.m_viewFormat = m_diffuseImage->GetImageDesc().m_format;
+            imageViewDesc.m_image = m_emissiveImage;
+            imageViewDesc.m_viewFormat = m_emissiveImage->GetImageDesc().m_format;
             imageViewDesc.m_aspectFlags = Vulkan::ImageViewAspect_Color;
             imageViewDesc.m_firstMip = 0;
             imageViewDesc.m_mipCount = 0;
@@ -207,8 +207,8 @@ namespace DX
             }
 
             Vulkan::ImageViewDesc imageViewDesc = {};
-            imageViewDesc.m_image = m_diffuseImage;
-            imageViewDesc.m_viewFormat = m_diffuseImage->GetImageDesc().m_format;
+            imageViewDesc.m_image = m_normalImage;
+            imageViewDesc.m_viewFormat = m_normalImage->GetImageDesc().m_format;
             imageViewDesc.m_aspectFlags = Vulkan::ImageViewAspect_Color;
             imageViewDesc.m_firstMip = 0;
             imageViewDesc.m_mipCount = 0;
