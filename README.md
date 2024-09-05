@@ -8,7 +8,7 @@ Project generated while doing the Udemy course *[Learn the Vulkan API with C++](
 
 Special emphasis has been placed on modularity, separating the Vulkan code into its own library. All the different graphics concepts have been encapsulated in different classes, making easy to read and understand, see [Rendering Engine Architecture](#Rendering-Engine-Architecture) section for more details. Also, additional improvements have been added on top of the course content (see [Vulkan Course Improvements](#Vulkan-Course-Improvements) section).
 
-<img src="./Vulkan-GraphicsEngine.gif">
+<img src="./Vulkan_GraphicsEngine.gif">
 
 ## Build and Run
 
