@@ -23,7 +23,7 @@ layout(set = 1, binding = 3) uniform texture2D normalImage;
 
 #define saturate(value)      clamp((value), 0.0, 1.0)
 
-const vec4 LightDir = vec4(1.0, -1.0, 1.0, 0.0);
+const vec4 LightDir = vec4(0.0, -1.0, 1.0, 0.0);
 const vec4 LightColor = vec4(1.0, 1.0, 1.0, 1.0);
 
 const vec3 AmbientColor = vec3(0.0, 0.0, 0.0);
