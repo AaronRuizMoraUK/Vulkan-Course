@@ -358,6 +358,11 @@ namespace Vulkan
         Utils::ScopedShaderModule vertexShaderModule(m_device);
         Utils::ScopedShaderModule framentShaderModule(m_device);
         {
+            // TODO: Look into https://github.com/google/shaderc and https://github.com/KhronosGroup/glslang 
+            //       to be able to compile shaders calling an API.
+            // 
+            // TODO: Look into https://github.com/KhronosGroup/SPIRV-Reflect and https://github.com/KhronosGroup/glslang 
+            //       to be able to obtain reflection data from the shaders.
             const char* vertexShaderFilename = "Shaders/Shader.vert.spv";
             const char* fragmentShaderFilename = "Shaders/Shader.frag.spv";
 
