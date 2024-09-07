@@ -148,6 +148,8 @@ namespace DX
 
     void Renderer::Render()
     {
+        // TODO: Move this code into classes (SwapChain and CommandBuffer).
+
         // About Vulkan Semaphores
         // 
         // Mechanism to achieve GPU-GPU synchronization.
