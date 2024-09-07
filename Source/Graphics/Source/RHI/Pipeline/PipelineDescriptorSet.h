@@ -37,11 +37,12 @@ namespace Vulkan
         const DescriptorSetLayout* GetDescriptorSetLayout() const;
         VkDescriptorSet GetVkDescriptorSet();
 
-        // Set resources using layout binding index inside the descriptor set layout.
-        void SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer);
-        void SetUniformBufferDynamic(uint32_t layoutBinding, Buffer* buffer);
-        void SetImageView(uint32_t layoutBinding, ImageView* imageView);
-        void SetSampler(uint32_t layoutBinding, Sampler* sampler);
+        // Set shader resources using layout binding index inside the descriptor set layout.
+        void SetShaderUniformBuffer(uint32_t layoutBinding, Buffer* buffer);
+        void SetShaderUniformBufferDynamic(uint32_t layoutBinding, Buffer* buffer);
+        void SetShaderSampledImageView(uint32_t layoutBinding, ImageView* imageView);
+        void SetShaderSampler(uint32_t layoutBinding, Sampler* sampler);
+        void SetShaderInputAttachment(uint32_t layoutBinding, ImageView* imageView);
 
     private:
         Device* m_device = nullptr;

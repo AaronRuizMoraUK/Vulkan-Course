@@ -76,3 +76,16 @@ add_library(Content INTERFACE
     ${ROOT_FILES}
     ${SCRIPT_FILES}
     ${ASSET_FILES})
+    
+# ----------------------------------------------------
+# TODO: Shader compilation and copying
+#file(GLOB_RECURSE SHADERS "${CMAKE_SOURCE_DIR}/Assets/Shaders/*.frag" "${CMAKE_SOURCE_DIR}/Assets/Shaders/*.vert")
+# 
+#foreach(shader ${SHADERS})
+#add_custom_command(TARGET My_Target POST_BUILD
+#    COMMAND glslc -c ${shader} -o ${shader}.spv)
+#endforeach()
+# 
+#add_custom_command(TARGET My_Target POST_BUILD
+#    COMMAND ${CMAKE_COMMAND} -E copy_directory
+#      ${CMAKE_SOURCE_DIR}/shaders/ $<TARGET_FILE_DIR:My_Target>/shaders)

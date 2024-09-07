@@ -78,10 +78,17 @@ namespace Vulkan
         return m_vkDescriptorSet;
     }
 
-    void PipelineDescriptorSet::SetUniformBuffer(uint32_t layoutBinding, Buffer* buffer)
+    void PipelineDescriptorSet::SetShaderUniformBuffer(uint32_t layoutBinding, Buffer* buffer)
     {
         // TODO: Once bindings are included in Descriptor Set Layout, this could validate
         //       that the layoutBinding is expecting a uniform buffer.
+
+        if ((buffer->GetBufferDesc().m_usageFlags & BufferUsage_UniformBuffer) == 0)
+        {
+            DX_LOG(Warning, "Vulkan PipelineDescriptorSet",
+                "Trying to set a buffer in shader whose usage is not BufferUsage_UniformBuffer.");
+            return;
+        }
 
         // Descriptor for the buffer (aka a Buffer View)
         // View to the entire buffer.
@@ -111,10 +118,17 @@ namespace Vulkan
             0, nullptr); // For copying descriptor sets to other descriptor sets
     }
 
-    void PipelineDescriptorSet::SetUniformBufferDynamic(uint32_t layoutBinding, Buffer* buffer)
+    void PipelineDescriptorSet::SetShaderUniformBufferDynamic(uint32_t layoutBinding, Buffer* buffer)
     {
         // TODO: Once bindings are included in Descriptor Set Layout, this could validate
         //       that the layoutBinding is expecting a uniform buffer dynamic.
+
+        if ((buffer->GetBufferDesc().m_usageFlags & BufferUsage_UniformBuffer) == 0)
+        {
+            DX_LOG(Warning, "Vulkan PipelineDescriptorSet",
+                "Trying to set a buffer in shader whose usage is not BufferUsage_UniformBuffer.");
+            return;
+        }
 
         // Descriptor for the buffer (aka a Buffer View)
         // View of 1 element and not of the entire buffer (many objects)
@@ -144,16 +158,23 @@ namespace Vulkan
             0, nullptr); // For copying descriptor sets to other descriptor sets
     }
 
-    void PipelineDescriptorSet::SetImageView(uint32_t layoutBinding, ImageView* imageView)
+    void PipelineDescriptorSet::SetShaderSampledImageView(uint32_t layoutBinding, ImageView* imageView)
     {
         // TODO: Once bindings are included in Descriptor Set Layout, this could validate
-        //       that the layoutBinding is expecting an image view.
+        //       that the layoutBinding is expecting an sampled image.
+
+        if ((imageView->GetImageViewDesc().m_image->GetImageDesc().m_usageFlags & ImageUsage_Sampled) == 0)
+        {
+            DX_LOG(Warning, "Vulkan PipelineDescriptorSet", 
+                "Trying to set a image view for sampling in shader whose image's usage is not ImageUsage_Sampled.");
+            return;
+        }
 
         // Descriptor for the image (aka a Image View)
         const VkDescriptorImageInfo vkDescriptorImageInfo = {
             .sampler = nullptr,
             .imageView = imageView->GetVkImageView(),
-            .imageLayout = static_cast<VkImageLayout>(imageView->GetImageDesc().m_image->GetVkImageLayout())
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL // Expected image layout when reading from shader
         };
 
         VkWriteDescriptorSet vkWriteDescriptorSet = {};
@@ -176,7 +197,7 @@ namespace Vulkan
             0, nullptr); // For copying descriptor sets to other descriptor sets
     }
 
-    void PipelineDescriptorSet::SetSampler(uint32_t layoutBinding, Sampler* sampler)
+    void PipelineDescriptorSet::SetShaderSampler(uint32_t layoutBinding, Sampler* sampler)
     {
         // TODO: Once bindings are included in Descriptor Set Layout, this could validate
         //       that the layoutBinding is expecting a sampler.
@@ -199,6 +220,45 @@ namespace Vulkan
         vkWriteDescriptorSet.dstArrayElement = 0; // If layout binding contains an array, index in array to update.
         vkWriteDescriptorSet.descriptorCount = 1; // How many descriptors (elements in pImageInfo) we are setting.
         vkWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+        vkWriteDescriptorSet.pImageInfo = &vkDescriptorImageInfo;
+        vkWriteDescriptorSet.pBufferInfo = nullptr;
+        vkWriteDescriptorSet.pTexelBufferView = nullptr;
+
+        vkUpdateDescriptorSets(m_device->GetVkDevice(),
+            1, &vkWriteDescriptorSet,
+            0, nullptr); // For copying descriptor sets to other descriptor sets
+    }
+
+    void PipelineDescriptorSet::SetShaderInputAttachment(uint32_t layoutBinding, ImageView* imageView)
+    {
+        // TODO: Once bindings are included in Descriptor Set Layout, this could validate
+        //       that the layoutBinding is expecting an input attachment.
+
+        if ((imageView->GetImageViewDesc().m_image->GetImageDesc().m_usageFlags & ImageUsage_InputAttachment) == 0)
+        {
+            DX_LOG(Warning, "Vulkan PipelineDescriptorSet",
+                "Trying to set a image view as input attachment whose image's usage is not ImageUsage_InputAttachment.");
+            return;
+        }
+
+        // Descriptor for the image (aka a Image View)
+        const VkDescriptorImageInfo vkDescriptorImageInfo = {
+            .sampler = nullptr,
+            .imageView = imageView->GetVkImageView(),
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL // Expected image layout when reading from shader
+        };
+
+        VkWriteDescriptorSet vkWriteDescriptorSet = {};
+        vkWriteDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        vkWriteDescriptorSet.pNext = nullptr;
+        vkWriteDescriptorSet.dstSet = m_vkDescriptorSet;
+        // Binding index from VkDescriptorSetLayoutCreateInfo.pBindings list.
+        // This is not the "binding" attribute from the shader, that's specified
+        // inside each element of the list.
+        vkWriteDescriptorSet.dstBinding = layoutBinding;
+        vkWriteDescriptorSet.dstArrayElement = 0; // If layout binding contains an array, index in array to update.
+        vkWriteDescriptorSet.descriptorCount = 1; // How many descriptors (elements in pImageInfo) we are setting.
+        vkWriteDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
         vkWriteDescriptorSet.pImageInfo = &vkDescriptorImageInfo;
         vkWriteDescriptorSet.pBufferInfo = nullptr;
         vkWriteDescriptorSet.pTexelBufferView = nullptr;

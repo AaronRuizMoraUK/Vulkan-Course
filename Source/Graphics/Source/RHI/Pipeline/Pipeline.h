@@ -61,8 +61,12 @@ namespace Vulkan
         Math::Rectangle m_viewport;
 
     private:
-        bool CreateVkPipelineLayout();
-        bool CreateVkPipeline();
+        // TODO: At the moment the pipelines are manually created since the user cannot specify
+        //       from a PipelineDesc the parameters. Refactor after there is a PipelineDesc struct.
+        bool CreateVkPipelineLayoutSubpass0();
+        bool CreateVkPipelineSubpass0();
+        bool CreateVkPipelineLayoutSubpass1();
+        bool CreateVkPipelineSubpass1();
 
         std::vector<std::unique_ptr<DescriptorSetLayout>> m_descriptorSetLayouts;
         VkPipelineLayout m_vkPipelineLayout = nullptr;

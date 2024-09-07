@@ -35,36 +35,6 @@ namespace Vulkan
         return std::numeric_limits<uint32_t>::max();
     }
 
-    ResourceFormat ChooseSupportedFormat(
-        VkPhysicalDevice vkPhysicalDevice,
-        const std::vector<ResourceFormat>& formats,
-        ImageTiling imageTiling,
-        VkFormatFeatureFlags vkFormatFeatureFlags)
-    {
-        // Loop through the formats provided and find a compatible one
-        for (ResourceFormat format : formats)
-        {
-            // Get properties of the format on this device
-            VkFormatProperties vkFormatProperties = {};
-            vkGetPhysicalDeviceFormatProperties(vkPhysicalDevice, ToVkFormat(format), &vkFormatProperties);
-
-            // Does the format support all features we requested for optimal tiling?
-            if (imageTiling == ImageTiling::Optimal &&
-                (vkFormatProperties.optimalTilingFeatures & vkFormatFeatureFlags) == vkFormatFeatureFlags)
-            {
-                return format;
-            }
-            // Does the format support all features we requested for lineal tiling?
-            else if (imageTiling == ImageTiling::Linear &&
-                (vkFormatProperties.linearTilingFeatures & vkFormatFeatureFlags) == vkFormatFeatureFlags)
-            {
-                return format;
-            }
-        }
-
-        return ResourceFormat::Unknown;
-    }
-
     VkFormat ToVkFormat(ResourceFormat format)
     {
         switch (format)
@@ -498,6 +468,21 @@ namespace Vulkan
         }
     }
 
+    VkImageViewType ToVkImageViewType(ImageType imageType)
+    {
+        switch (imageType)
+        {
+        case ImageType::Image1D: return VK_IMAGE_VIEW_TYPE_1D;
+        case ImageType::Image2D: return VK_IMAGE_VIEW_TYPE_2D;
+        case ImageType::Image3D: return VK_IMAGE_VIEW_TYPE_3D;
+
+        case ImageType::Unknown:
+        default:
+            DX_LOG(Fatal, "Vulkan Utils", "Unknown image type %d", imageType);
+            return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+        }
+    }
+
     VkImageTiling ToVkImageTiling(ImageTiling imageTiling)
     {
         switch (imageTiling)
@@ -520,6 +505,7 @@ namespace Vulkan
         vkImageUsageFlags |= (flags & ImageUsage_Storage) ? VK_IMAGE_USAGE_STORAGE_BIT : 0;
         vkImageUsageFlags |= (flags & ImageUsage_ColorAttachment) ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT : 0;
         vkImageUsageFlags |= (flags & ImageUsage_DepthStencilAttachment) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT : 0;
+        vkImageUsageFlags |= (flags & ImageUsage_InputAttachment) ? VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT : 0;
 
         return vkImageUsageFlags;
     }

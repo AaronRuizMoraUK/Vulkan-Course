@@ -214,10 +214,13 @@ namespace Vulkan
     {
         DX_LOG(Info, "Vulkan SwapChain", "Terminating Vulkan SwapChain...");
 
-        DestroyFrameBuffers();
-
         vkDestroySwapchainKHR(m_device->GetVkDevice(), m_vkSwapChain, nullptr);
         m_vkSwapChain = nullptr;
+    }
+
+    uint32_t SwapChain::GetImageCount() const
+    {
+        return m_imageCount;
     }
 
     ResourceFormat SwapChain::GetImageFormat() const
@@ -228,23 +231,6 @@ namespace Vulkan
     const Math::Vector2Int& SwapChain::GetImageSize() const
     {
         return m_imageSize;
-    }
-
-    ResourceFormat SwapChain::GetDepthStencilFormat() const
-    {
-        return m_depthStencilFormat;
-    }
-
-    uint32_t SwapChain::GetImageCount() const
-    {
-        return m_imageCount;
-    }
-
-    FrameBuffer* SwapChain::GetFrameBuffer(uint32_t imageIndex)
-    {
-        return (imageIndex < m_frameBuffers.size())
-            ? m_frameBuffers[imageIndex].get()
-            : nullptr;
     }
 
     VkSwapchainKHR SwapChain::GetVkSwapChain()
@@ -322,92 +308,15 @@ namespace Vulkan
         m_imageSize = Math::Vector2Int(vkImageExtent.width, vkImageExtent.height);
         vkGetSwapchainImagesKHR(m_device->GetVkDevice(), m_vkSwapChain, &m_imageCount, nullptr);
 
-        m_depthStencilFormat = ChooseSupportedFormat(m_device->GetVkPhysicalDevice(),
-            { ResourceFormat::D32_SFLOAT_S8_UINT, ResourceFormat::D24_UNORM_S8_UINT },
-            ImageTiling::Optimal,
-            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-        );
-
         DX_LOG(Verbose, "Vulkan SwapChain", "SwapChain Properties:");
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Size: %dx%d", m_imageSize.x, m_imageSize.y);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Count: %d", m_imageCount);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Format: %d", m_imageFormat);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Image Color Space: %d", vkSurfaceFormat.colorSpace);
-        DX_LOG(Verbose, "Vulkan SwapChain", "\t- DepthStencil Format: %d", m_depthStencilFormat);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Present Mode: %d", vkPresentMode);
         DX_LOG(Verbose, "Vulkan SwapChain", "\t- Unique Queue Family Indices: %d", uniqueFamilyIndices.size());
 
         return true;
-    }
-
-    bool SwapChain::CreateFrameBuffers(RenderPass* renderPass)
-    {
-        DX_LOG(Info, "Vulkan SwapChain", "Creating Vulkan FrameBuffers for SwapChain...");
-
-        std::vector<std::shared_ptr<Image>> swapChainImages = ObtainImagesFromSwapChain();
-        if (swapChainImages.empty())
-        {
-            DX_LOG(Error, "Vulkan SwapChain", "Failed to obtain Vulkan SwapChain Images.");
-            return false;
-        }
-
-        // Create DepthStencil Image
-        std::shared_ptr<Image> depthStencilImage;
-        {
-            ImageDesc depthStencilImageDesc = {};
-            depthStencilImageDesc.m_imageType = ImageType::Image2D;
-            depthStencilImageDesc.m_dimensions = Math::Vector3Int(m_imageSize, 1);
-            depthStencilImageDesc.m_mipCount = 1;
-            depthStencilImageDesc.m_format = m_depthStencilFormat;
-            depthStencilImageDesc.m_tiling = ImageTiling::Optimal;
-            depthStencilImageDesc.m_usageFlags = ImageUsage_DepthStencilAttachment;
-
-            depthStencilImage = std::make_shared<Image>(m_device, depthStencilImageDesc);
-            if (!depthStencilImage->Initialize())
-            {
-                DX_LOG(Error, "Vulkan SwapChain", "Failed to create Vulkan Image for Depth Attachment.");
-                return false;
-            }
-        }
-
-        std::vector<std::unique_ptr<FrameBuffer>> frameBuffers;
-        frameBuffers.reserve(swapChainImages.size());
-
-        for (auto& swapChainImage : swapChainImages)
-        {
-            FrameBufferDesc frameBufferDesc = {};
-            frameBufferDesc.m_renderPass = renderPass;
-            frameBufferDesc.m_colorAttachments = FrameBufferDesc::ImageAttachments{
-                {
-                    swapChainImage,
-                    swapChainImage->GetImageDesc().m_format
-                }
-            };
-            frameBufferDesc.m_depthStencilAttachment = {
-                depthStencilImage,
-                depthStencilImage->GetImageDesc().m_format
-            };
-
-            auto frameBuffer = std::make_unique<FrameBuffer>(m_device, frameBufferDesc);
-            if (!frameBuffer->Initialize())
-            {
-                DX_LOG(Error, "Vulkan SwapChain", "Failed to create FrameBuffer.");
-                return false;
-            }
-
-            frameBuffers.push_back(std::move(frameBuffer));
-        }
-
-        m_frameBuffers = std::move(frameBuffers);
-
-        return true;
-    }
-
-    void SwapChain::DestroyFrameBuffers()
-    {
-        DX_LOG(Info, "Vulkan SwapChain", "Destroying Vulkan FrameBuffers from SwapChain...");
-
-        m_frameBuffers.clear();
     }
 
     std::vector<std::shared_ptr<Image>> SwapChain::ObtainImagesFromSwapChain()

@@ -60,7 +60,7 @@ namespace Vulkan
         vkImageViewCreateInfo.pNext = nullptr;
         vkImageViewCreateInfo.flags = 0;
         vkImageViewCreateInfo.image = m_desc.m_image->GetVkImage();
-        vkImageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        vkImageViewCreateInfo.viewType = ToVkImageViewType(m_desc.m_image->GetImageDesc().m_imageType);
         vkImageViewCreateInfo.format = ToVkFormat(m_desc.m_viewFormat);
         vkImageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
         vkImageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;

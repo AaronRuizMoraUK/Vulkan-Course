@@ -18,6 +18,25 @@ namespace Vulkan
 {
     namespace Utils
     {
+        // Helper structure to destroy shader module when it gets out of scope.
+        struct ScopedShaderModule
+        {
+            VkShaderModule m_vkShaderModule = nullptr;
+
+            ScopedShaderModule(Device* device)
+                : m_device(device)
+            {
+            }
+
+            ~ScopedShaderModule()
+            {
+                vkDestroyShaderModule(m_device->GetVkDevice(), m_vkShaderModule, nullptr);
+            }
+
+        private:
+            Device* m_device = nullptr;
+        };
+
         bool CreateVkShaderModule(VkDevice vkDevice, const std::vector<uint8_t>& shaderByteCode, VkShaderModule* vkShaderModuleOut)
         {
             if (shaderByteCode.size() % sizeof(uint32_t) != 0)
@@ -81,15 +100,37 @@ namespace Vulkan
 
         DX_LOG(Info, "Vulkan Pipeline", "Initializing Vulkan Pipeline...");
 
-        if (!CreateVkPipelineLayout())
+        if (m_subpassIndex == 0)
         {
-            Terminate();
-            return false;
-        }
+            if (!CreateVkPipelineLayoutSubpass0())
+            {
+                Terminate();
+                return false;
+            }
 
-        if (!CreateVkPipeline())
+            if (!CreateVkPipelineSubpass0())
+            {
+                Terminate();
+                return false;
+            }
+        }
+        else if (m_subpassIndex == 1)
         {
-            Terminate();
+            if (!CreateVkPipelineLayoutSubpass1())
+            {
+                Terminate();
+                return false;
+            }
+
+            if (!CreateVkPipelineSubpass1())
+            {
+                Terminate();
+                return false;
+            }
+        }
+        else
+        {
+            DX_LOG(Fatal, "Vulkan Pipeline", "Subpass index is %d and must be 0 or 1.", m_subpassIndex);
             return false;
         }
 
@@ -160,7 +201,7 @@ namespace Vulkan
         return nullptr;
     }
 
-    bool Pipeline::CreateVkPipelineLayout()
+    bool Pipeline::CreateVkPipelineLayoutSubpass0()
     {
         // TODO: Obtain this from the shaders.
 
@@ -301,27 +342,8 @@ namespace Vulkan
         return true;
     }
 
-    bool Pipeline::CreateVkPipeline()
+    bool Pipeline::CreateVkPipelineSubpass0()
     {
-        // Helper structure to destroy shader module when it gets out of scope.
-        struct ScopedShaderModule
-        {
-            VkShaderModule m_vkShaderModule = nullptr;
-
-            ScopedShaderModule(Device* device)
-                : m_device(device)
-            {
-            }
-
-            ~ScopedShaderModule()
-            {
-                vkDestroyShaderModule(m_device->GetVkDevice(), m_vkShaderModule, nullptr);
-            }
-
-        private:
-            Device* m_device = nullptr;
-        };
-
         // TODO: Pass all info to the Pipeline class, rather than generate them here.
 
         // Create Shader Modules
@@ -333,11 +355,11 @@ namespace Vulkan
         // 
         // TODO: Pass from a configuration if the Pipeline should destroy them or not,
         //       in case they will be reused for creating other pipelines.
-        ScopedShaderModule vertexShaderModule(m_device);
-        ScopedShaderModule framentShaderModule(m_device);
+        Utils::ScopedShaderModule vertexShaderModule(m_device);
+        Utils::ScopedShaderModule framentShaderModule(m_device);
         {
-            const char* vertexShaderFilename = "Shaders/vert.spv";
-            const char* fragmentShaderFilename = "Shaders/frag.spv";
+            const char* vertexShaderFilename = "Shaders/Shader.vert.spv";
+            const char* fragmentShaderFilename = "Shaders/Shader.frag.spv";
 
             // Read Shader ByteCode (SPIR-V)
             const auto vertexShaderByteCode = DX::ReadAssetBinaryFile(vertexShaderFilename);
@@ -515,7 +537,7 @@ namespace Vulkan
                 .blendEnable = VK_FALSE,
                 .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
             };
-            
+
             VkPipelineColorBlendStateCreateInfo vkPipelineColorBlendStateCreateInfo = {};
             vkPipelineColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
             vkPipelineColorBlendStateCreateInfo.pNext = nullptr;
@@ -536,6 +558,289 @@ namespace Vulkan
             vkPipelineDepthStencilStateCreateInfo.flags = 0;
             vkPipelineDepthStencilStateCreateInfo.depthTestEnable = VK_TRUE;
             vkPipelineDepthStencilStateCreateInfo.depthWriteEnable = VK_TRUE;
+            vkPipelineDepthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
+            vkPipelineDepthStencilStateCreateInfo.depthBoundsTestEnable = VK_FALSE; // When true, to pass the depth test the depth value must be between minDepthBounds and maxDepthBounds
+            vkPipelineDepthStencilStateCreateInfo.minDepthBounds = 0.0f;
+            vkPipelineDepthStencilStateCreateInfo.maxDepthBounds = 0.0f;
+            vkPipelineDepthStencilStateCreateInfo.stencilTestEnable = VK_FALSE;
+            //vkPipelineDepthStencilStateCreateInfo.front;
+            //vkPipelineDepthStencilStateCreateInfo.back;
+
+            // Finally, create the graphics pipeline
+            VkGraphicsPipelineCreateInfo vkGraphicsPipelineCreateInfo;
+            vkGraphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+            vkGraphicsPipelineCreateInfo.pNext = nullptr;
+            vkGraphicsPipelineCreateInfo.flags = 0;
+            vkGraphicsPipelineCreateInfo.stageCount = static_cast<uint32_t>(vkPipelineShaderStagesCreateInfo.size());
+            vkGraphicsPipelineCreateInfo.pStages = vkPipelineShaderStagesCreateInfo.data();
+            vkGraphicsPipelineCreateInfo.pVertexInputState = &vkPipelineVertexInputStateCreateInfo;
+            vkGraphicsPipelineCreateInfo.pInputAssemblyState = &vkPipelineInputAssemblyStateCreateInfo;
+            vkGraphicsPipelineCreateInfo.pTessellationState = nullptr;
+            vkGraphicsPipelineCreateInfo.pViewportState = &vkPipelineViewportStateCreateInfo;
+            vkGraphicsPipelineCreateInfo.pRasterizationState = &vkPipelineRasterizationStateCreateInfo;
+            vkGraphicsPipelineCreateInfo.pMultisampleState = &vkPipelineMultisampleStateCreateInfo;
+            vkGraphicsPipelineCreateInfo.pDepthStencilState = &vkPipelineDepthStencilStateCreateInfo;
+            vkGraphicsPipelineCreateInfo.pColorBlendState = &vkPipelineColorBlendStateCreateInfo;
+            vkGraphicsPipelineCreateInfo.pDynamicState = nullptr;
+            vkGraphicsPipelineCreateInfo.layout = m_vkPipelineLayout;
+            vkGraphicsPipelineCreateInfo.renderPass = m_renderPass->GetVkRenderPass(); // Render Pass that is going to use this pipeline
+            vkGraphicsPipelineCreateInfo.subpass = m_subpassIndex; // 1 pipeline can only be used in 1 subpass. Normally there are separate pipelines for each subpass.
+
+            // For pipeline derivatives: Can create multiple pipelines that derive from one another for optimization
+            vkGraphicsPipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE; // Existing pipeline to derive from...
+            vkGraphicsPipelineCreateInfo.basePipelineIndex = -1;              // or index of pipeline being created to derive from (in case creating multiple at once)
+
+            if (vkCreateGraphicsPipelines(
+                m_device->GetVkDevice(), VK_NULL_HANDLE,
+                1, &vkGraphicsPipelineCreateInfo, nullptr, &m_vkPipeline) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Pipeline.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool Pipeline::CreateVkPipelineLayoutSubpass1()
+    {
+        // TODO: Obtain this from the shaders.
+
+        // Reset the descriptor set layouts
+        m_descriptorSetLayouts.clear();
+
+        // Descriptor Sets Layout 0: Input Attachments
+        {
+            const std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
+                // Color Input Binding Info
+                {
+                    .binding = 0,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, // Shader stage to bind to
+                    .pImmutableSamplers = nullptr
+                },
+                // Depth Input Binding Info
+                {
+                    .binding = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                    .descriptorCount = 1, // Number of contiguous descriptors of this type for binding in shader
+                    .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT, // Shader stage to bind to
+                    .pImmutableSamplers = nullptr
+                }
+            };
+
+            auto descriptorSetLayout = std::make_unique<DescriptorSetLayout>();
+
+            descriptorSetLayout->m_numDynamicDescriptors = Utils::GetDynamicDescritorCount(descriptorSetLayoutBindings);
+
+            // Create Descriptor Set Layout with given bindings
+            VkDescriptorSetLayoutCreateInfo vkDescriptorSetLayoutCreateInfo = {};
+            vkDescriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+            vkDescriptorSetLayoutCreateInfo.pNext = nullptr;
+            vkDescriptorSetLayoutCreateInfo.flags = 0;
+            vkDescriptorSetLayoutCreateInfo.bindingCount = static_cast<uint32_t>(descriptorSetLayoutBindings.size());
+            vkDescriptorSetLayoutCreateInfo.pBindings = descriptorSetLayoutBindings.data();
+
+            if (vkCreateDescriptorSetLayout(m_device->GetVkDevice(),
+                &vkDescriptorSetLayoutCreateInfo, nullptr, &descriptorSetLayout->m_vkDescriptorSetLayout) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Descriptor Set Layout.");
+                return false;
+            }
+
+            m_descriptorSetLayouts.push_back(std::move(descriptorSetLayout));
+        }
+
+        // Pipeline Layout = Descriptor set layouts + Push constant ranges
+        {
+            std::vector<VkDescriptorSetLayout> vkDescriptorSetLayouts(m_descriptorSetLayouts.size(), nullptr);
+            std::transform(m_descriptorSetLayouts.begin(), m_descriptorSetLayouts.end(), vkDescriptorSetLayouts.begin(),
+                [](std::unique_ptr<DescriptorSetLayout>& descriptorSetLayout)
+                {
+                    return descriptorSetLayout->m_vkDescriptorSetLayout;
+                });
+
+            // Create Pipeline Layout (Resources Layout)
+            // Where to specify Descriptor Set Layouts and Push Constant Ranges.
+            VkPipelineLayoutCreateInfo vkPipelineLayoutCreateInfo = {};
+            vkPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+            vkPipelineLayoutCreateInfo.pNext = nullptr;
+            vkPipelineLayoutCreateInfo.flags = 0;
+            vkPipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(vkDescriptorSetLayouts.size());
+            vkPipelineLayoutCreateInfo.pSetLayouts = vkDescriptorSetLayouts.data();
+            vkPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+            vkPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+
+            if (vkCreatePipelineLayout(m_device->GetVkDevice(), &vkPipelineLayoutCreateInfo, nullptr, &m_vkPipelineLayout) != VK_SUCCESS)
+            {
+                DX_LOG(Error, "Vulkan Pipeline", "Failed to create Vulkan Pipeline Layout.");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool Pipeline::CreateVkPipelineSubpass1()
+    {
+        // Create Shader Modules
+        Utils::ScopedShaderModule vertexShaderModule(m_device);
+        Utils::ScopedShaderModule framentShaderModule(m_device);
+        {
+            const char* vertexShaderFilename = "Shaders/PostShader.vert.spv";
+            const char* fragmentShaderFilename = "Shaders/PostShader.frag.spv";
+
+            // Read Shader ByteCode (SPIR-V)
+            const auto vertexShaderByteCode = DX::ReadAssetBinaryFile(vertexShaderFilename);
+            if (!vertexShaderByteCode.has_value())
+            {
+                DX_LOG(Error, "Renderer", "Failed to read vertex shader file %s.", vertexShaderFilename);
+                return false;
+            }
+
+            const auto fragmentShaderByteCode = DX::ReadAssetBinaryFile(fragmentShaderFilename);
+            if (!vertexShaderByteCode.has_value())
+            {
+                DX_LOG(Error, "Renderer", "Failed to read fragment shader file %s.", fragmentShaderFilename);
+                return false;
+            }
+
+            // Create Shader Models
+            if (!Utils::CreateVkShaderModule(m_device->GetVkDevice(), vertexShaderByteCode.value(), &vertexShaderModule.m_vkShaderModule))
+            {
+                DX_LOG(Error, "Renderer", "Failed to create Vulkan vertex shader module for shader %s.", vertexShaderFilename);
+                return false;
+            }
+
+            if (!Utils::CreateVkShaderModule(m_device->GetVkDevice(), fragmentShaderByteCode.value(), &framentShaderModule.m_vkShaderModule))
+            {
+                DX_LOG(Error, "Renderer", "Failed to create Vulkan fragment shader modul for shader %s.", fragmentShaderFilename);
+                return false;
+            }
+        }
+
+        // Create Pipeline
+        {
+            // Pipeline Shader Stages
+            std::array<VkPipelineShaderStageCreateInfo, 2> vkPipelineShaderStagesCreateInfo;
+
+            vkPipelineShaderStagesCreateInfo[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vkPipelineShaderStagesCreateInfo[0].pNext = nullptr;
+            vkPipelineShaderStagesCreateInfo[0].flags = 0;
+            vkPipelineShaderStagesCreateInfo[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+            vkPipelineShaderStagesCreateInfo[0].module = vertexShaderModule.m_vkShaderModule;
+            vkPipelineShaderStagesCreateInfo[0].pName = "main";
+            vkPipelineShaderStagesCreateInfo[0].pSpecializationInfo = nullptr;
+
+            vkPipelineShaderStagesCreateInfo[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            vkPipelineShaderStagesCreateInfo[1].pNext = nullptr;
+            vkPipelineShaderStagesCreateInfo[1].flags = 0;
+            vkPipelineShaderStagesCreateInfo[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+            vkPipelineShaderStagesCreateInfo[1].module = framentShaderModule.m_vkShaderModule;
+            vkPipelineShaderStagesCreateInfo[1].pName = "main";
+            vkPipelineShaderStagesCreateInfo[1].pSpecializationInfo = nullptr;
+
+            // Pipeline Vertex Input State (Input Layout) - No vertex input data for this pass, vertex positions in vertex shader.
+            VkPipelineVertexInputStateCreateInfo vkPipelineVertexInputStateCreateInfo = {};
+            vkPipelineVertexInputStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+            vkPipelineVertexInputStateCreateInfo.pNext = nullptr;
+            vkPipelineVertexInputStateCreateInfo.flags = 0;
+            vkPipelineVertexInputStateCreateInfo.vertexBindingDescriptionCount = 0;
+            vkPipelineVertexInputStateCreateInfo.pVertexBindingDescriptions = nullptr; // Info about data spacing, stride info
+            vkPipelineVertexInputStateCreateInfo.vertexAttributeDescriptionCount = 0;
+            vkPipelineVertexInputStateCreateInfo.pVertexAttributeDescriptions = nullptr; // Info about data format and where to bind to/from
+
+            // Pipeline Input Assembly State (Primitive Topology)
+            VkPipelineInputAssemblyStateCreateInfo vkPipelineInputAssemblyStateCreateInfo = {};
+            vkPipelineInputAssemblyStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+            vkPipelineInputAssemblyStateCreateInfo.pNext = nullptr;
+            vkPipelineInputAssemblyStateCreateInfo.flags = 0;
+            vkPipelineInputAssemblyStateCreateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+            vkPipelineInputAssemblyStateCreateInfo.primitiveRestartEnable = VK_FALSE; // When true it allows overriding of "strip" topology to start new primitives
+
+            // Viewport & Scissor State
+            // Number of viewports and scissors must match in Vulkan.
+            const VkViewport vkViewport = {
+                .x = m_viewport.pos.x,
+                .y = m_viewport.pos.y,
+                .width = m_viewport.size.x,
+                .height = m_viewport.size.y,
+                .minDepth = 0.0f,
+                .maxDepth = 1.0f
+            };
+
+            const VkRect2D vkScissor = {
+                .offset = {static_cast<int32_t>(m_viewport.pos.x), static_cast<int32_t>(m_viewport.pos.y)},
+                .extent = {static_cast<uint32_t>(m_viewport.size.x), static_cast<uint32_t>(m_viewport.size.y)}
+            };
+
+            VkPipelineViewportStateCreateInfo vkPipelineViewportStateCreateInfo = {};
+            vkPipelineViewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+            vkPipelineViewportStateCreateInfo.pNext = nullptr;
+            vkPipelineViewportStateCreateInfo.flags = 0;
+            vkPipelineViewportStateCreateInfo.viewportCount = 1;
+            vkPipelineViewportStateCreateInfo.pViewports = &vkViewport;
+            vkPipelineViewportStateCreateInfo.scissorCount = 1;
+            vkPipelineViewportStateCreateInfo.pScissors = &vkScissor;
+
+            // Pipeline Rasterization State
+            VkPipelineRasterizationStateCreateInfo vkPipelineRasterizationStateCreateInfo = {};
+            vkPipelineRasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+            vkPipelineRasterizationStateCreateInfo.pNext = nullptr;
+            vkPipelineRasterizationStateCreateInfo.flags = 0;
+            vkPipelineRasterizationStateCreateInfo.depthClampEnable = VK_FALSE; // Requires enabled feature "depthClamp" in logical device. When enabled it clamps fragments depth at near/far planes so they won't get clipped.
+            vkPipelineRasterizationStateCreateInfo.rasterizerDiscardEnable = VK_FALSE; // When enabled it skips rasterizer and never creates fragments.
+            vkPipelineRasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
+            vkPipelineRasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+            vkPipelineRasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+            vkPipelineRasterizationStateCreateInfo.depthBiasEnable = VK_FALSE;
+            vkPipelineRasterizationStateCreateInfo.depthBiasConstantFactor = 0.0f;
+            vkPipelineRasterizationStateCreateInfo.depthBiasClamp = 0.0f;
+            vkPipelineRasterizationStateCreateInfo.depthBiasSlopeFactor = 0.0f;
+            vkPipelineRasterizationStateCreateInfo.lineWidth = 1.0f; // To use value other than 1.0f it requires enable feature "wideLines" in logical device.
+
+            // Pipeline Multisample State (MSAA)
+            VkPipelineMultisampleStateCreateInfo vkPipelineMultisampleStateCreateInfo = {};
+            vkPipelineMultisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+            vkPipelineMultisampleStateCreateInfo.pNext = nullptr;
+            vkPipelineMultisampleStateCreateInfo.flags = 0;
+            vkPipelineMultisampleStateCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+            vkPipelineMultisampleStateCreateInfo.sampleShadingEnable = VK_FALSE;
+            vkPipelineMultisampleStateCreateInfo.minSampleShading = 0.0f;
+            vkPipelineMultisampleStateCreateInfo.pSampleMask = nullptr;
+            vkPipelineMultisampleStateCreateInfo.alphaToCoverageEnable = VK_FALSE;
+            vkPipelineMultisampleStateCreateInfo.alphaToOneEnable = VK_FALSE;
+
+            // Pipeline Color Blend State
+            //
+            // Blend equation:
+            // (srcColorBlendFactor * srcColor) colorBlendOp (dstColorBlendFactor * dstColor)
+            const VkPipelineColorBlendAttachmentState vkPipelineColorBlendAttachmentState = {
+                .blendEnable = VK_FALSE,
+                .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+            };
+            
+            VkPipelineColorBlendStateCreateInfo vkPipelineColorBlendStateCreateInfo = {};
+            vkPipelineColorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+            vkPipelineColorBlendStateCreateInfo.pNext = nullptr;
+            vkPipelineColorBlendStateCreateInfo.flags = 0;
+            vkPipelineColorBlendStateCreateInfo.logicOpEnable = VK_FALSE;
+            vkPipelineColorBlendStateCreateInfo.logicOp = VK_LOGIC_OP_COPY;
+            vkPipelineColorBlendStateCreateInfo.attachmentCount = 1;
+            vkPipelineColorBlendStateCreateInfo.pAttachments = &vkPipelineColorBlendAttachmentState;
+            vkPipelineColorBlendStateCreateInfo.blendConstants[0] = 0.0f;
+            vkPipelineColorBlendStateCreateInfo.blendConstants[1] = 0.0f;
+            vkPipelineColorBlendStateCreateInfo.blendConstants[2] = 0.0f;
+            vkPipelineColorBlendStateCreateInfo.blendConstants[3] = 0.0f;
+
+            // Pipeline Depth Stencil State - Depth test disabled
+            VkPipelineDepthStencilStateCreateInfo vkPipelineDepthStencilStateCreateInfo = {};
+            vkPipelineDepthStencilStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+            vkPipelineDepthStencilStateCreateInfo.pNext = nullptr;
+            vkPipelineDepthStencilStateCreateInfo.flags = 0;
+            vkPipelineDepthStencilStateCreateInfo.depthTestEnable = VK_FALSE;
+            vkPipelineDepthStencilStateCreateInfo.depthWriteEnable = VK_FALSE;
             vkPipelineDepthStencilStateCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS;
             vkPipelineDepthStencilStateCreateInfo.depthBoundsTestEnable = VK_FALSE; // When true, to pass the depth test the depth value must be between minDepthBounds and maxDepthBounds
             vkPipelineDepthStencilStateCreateInfo.minDepthBounds = 0.0f;

@@ -176,10 +176,16 @@ namespace Vulkan
         }
 
         bool TransitionImageLayout(Device* device, Image* image, 
-            VkImageLayout vkOldImageLayout, VkImageLayout vkNewImageLayout,
+            int& vkCurrImageLayoutOut, VkImageLayout vkNewImageLayout,
             VkPipelineStageFlags vkSrcPipelineStage, VkAccessFlags vkSrcAccessMask,
             VkPipelineStageFlags vkDstPipelineStage, VkAccessFlags vkDstAccessMask)
         {
+            // Do nothing if it's already in target layout
+            if (vkCurrImageLayoutOut == vkNewImageLayout)
+            {
+                return true;
+            }
+
             CommandBuffer cmdBuffer(device,
                 device->GetVkCommandPool(QueueFamilyType_Graphics, ResourceTransferCommandPoolIndex));
             if (cmdBuffer.Initialize())
@@ -190,7 +196,7 @@ namespace Vulkan
                 if (cmdBuffer.Begin(CommandBufferUsage_OneTimeSubmit))
                 {
                     cmdBuffer.PipelineImageMemoryBarrier(image, 
-                        vkOldImageLayout, vkNewImageLayout,
+                        vkCurrImageLayoutOut, vkNewImageLayout,
                         vkSrcPipelineStage, vkSrcAccessMask,
                         vkDstPipelineStage, vkDstAccessMask);
 
@@ -212,6 +218,9 @@ namespace Vulkan
                 return false;
             }
 
+            // Assign the new layout now that the transition has happened
+            vkCurrImageLayoutOut = vkNewImageLayout;
+
             return true;
         }
     } // Utils
@@ -219,6 +228,7 @@ namespace Vulkan
     Image::Image(Device* device, const ImageDesc& desc)
         : m_device(device)
         , m_desc(desc)
+        , m_vkImageLayout(VK_IMAGE_LAYOUT_UNDEFINED)
     {
     }
 
@@ -380,7 +390,7 @@ namespace Vulkan
 
             // Transition image layout to be TRANSFER_DST_OPTIMAL for copy operation
             if (!Utils::TransitionImageLayout(m_device, this, 
-                VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                m_vkImageLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 // AFTER any point at the very start of the pipeline
                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
                 // BEFORE it attempts to do a transfer write operation at the transfer stage of the pipeline
@@ -400,7 +410,7 @@ namespace Vulkan
             {
                 // Transition to be shader readable for shader usage
                 if (!Utils::TransitionImageLayout(m_device, this,
-                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    m_vkImageLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     // AFTER it has finished to do writing operations in the transfer stage
                     // (basically when the copy buffer to image has finished)
                     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -409,13 +419,12 @@ namespace Vulkan
                 {
                     return false;
                 }
-                m_vkImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             }
             else if (m_desc.m_usageFlags & ImageUsage_Storage)
             {
                 // Transition to be general so it can be read/written in the shader
                 if (!Utils::TransitionImageLayout(m_device, this,
-                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                    m_vkImageLayout, VK_IMAGE_LAYOUT_GENERAL,
                     // AFTER it has finished to do writing operations in the transfer stage
                     // (basically when the copy buffer to image has finished)
                     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -424,7 +433,6 @@ namespace Vulkan
                 {
                     return false;
                 }
-                m_vkImageLayout = VK_IMAGE_LAYOUT_GENERAL;
             }
             else if (m_desc.m_usageFlags & ImageUsage_ColorAttachment)
             {
@@ -433,6 +441,10 @@ namespace Vulkan
             else if (m_desc.m_usageFlags & ImageUsage_DepthStencilAttachment)
             {
                 DX_LOG(Error, "Vulkan Image", "Image usage is to as depth stencil attachment, but data was provided.");
+            }
+            else if (m_desc.m_usageFlags & ImageUsage_InputAttachment)
+            {
+                DX_LOG(Error, "Vulkan Image", "Image usage is to as input attachment, but data was provided.");
             }
         }
         // It there is no initial data to copy, just create image in GPU
@@ -465,7 +477,7 @@ namespace Vulkan
             {
                 // Transition to be general so it can be read/written in the shader
                 if (!Utils::TransitionImageLayout(m_device, this,
-                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                    m_vkImageLayout, VK_IMAGE_LAYOUT_GENERAL,
                     // AFTER any point at the very start of the pipeline
                     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0,
                     // BEFORE it attempts to do a shader read/write operation at the fragment shader stage of the pipeline
@@ -473,17 +485,18 @@ namespace Vulkan
                 {
                     return false;
                 }
-                m_vkImageLayout = VK_IMAGE_LAYOUT_GENERAL;
             }
             else if (m_desc.m_usageFlags & ImageUsage_ColorAttachment)
             {
                 // Leave the layout as VK_IMAGE_LAYOUT_UNDEFINED and Render Pass will handle the transitions
-                m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             }
             else if (m_desc.m_usageFlags & ImageUsage_DepthStencilAttachment)
             {
                 // Leave the layout as VK_IMAGE_LAYOUT_UNDEFINED and Render Pass will handle the transitions
-                m_vkImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            }
+            else if (m_desc.m_usageFlags & ImageUsage_InputAttachment)
+            {
+                // Leave the layout as VK_IMAGE_LAYOUT_UNDEFINED and Render Pass will handle the transitions
             }
         }
 

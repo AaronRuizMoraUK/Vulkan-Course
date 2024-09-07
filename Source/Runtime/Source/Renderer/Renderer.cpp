@@ -9,12 +9,16 @@
 #include <RHI/Pipeline/PipelineDescriptorSet.h>
 #include <RHI/CommandBuffer/CommandBuffer.h>
 #include <RHI/Resource/Buffer/Buffer.h>
+#include <RHI/Resource/Image/Image.h>
+#include <RHI/Resource/ImageView/ImageView.h>
+#include <RHI/FrameBuffer/FrameBuffer.h>
 
 #include <Camera/Camera.h>
 
 #include <Log/Log.h>
 #include <Debug/Debug.h>
 
+// TODO: To be removed. Required for VkSemaphore, VkFence, VkCommandPool and VkFormatFeatureFlagBits used.
 #include <vulkan/vulkan.h>
 
 namespace DX
@@ -22,6 +26,8 @@ namespace DX
     Renderer::Renderer(RendererId rendererId, Window* window)
         : m_rendererId(rendererId)
         , m_window(window)
+        , m_frameBufferColorFormat(Vulkan::ResourceFormat::Unknown)
+        , m_frameBufferDepthStencilFormat(Vulkan::ResourceFormat::Unknown)
     {
     }
 
@@ -69,7 +75,7 @@ namespace DX
             return false;
         }
 
-        if (!CreatePipeline())
+        if (!CreatePipelines())
         {
             Terminate();
             return false;
@@ -97,6 +103,7 @@ namespace DX
 
         DX_LOG(Info, "Renderer", "Terminating Renderer...");
 
+        m_inputAttachmentsDescritorSets.clear();
         m_perObjectDescritorSets.clear();
         m_perSceneDescritorSets.clear();
         m_viewProjUniformBuffers.clear();
@@ -121,7 +128,8 @@ namespace DX
         m_vkRenderFinishedSemaphores.clear();
         m_vkRenderFences.clear();
 
-        m_pipeline.reset();
+        m_pipelines.clear();
+        m_frameBuffers.clear();
         m_renderPass.reset();
         m_swapChain.reset();
         m_device.reset();
@@ -176,8 +184,8 @@ namespace DX
         }
 
         // 2) Update data and record the commands for the current frame
-        UpdateFrameData();
-        RecordCommands(m_swapChain->GetFrameBuffer(swapChainImageIndex));
+        UpdateFrameData(m_frameBuffers[swapChainImageIndex].get());
+        RecordCommands(m_frameBuffers[swapChainImageIndex].get());
 
         // 3) Submit the command buffer (of the current image) to the queue for execution.
         //    Wait at the convenient stage within the pipeline for the image semaphore to be signaled (so it's available for drawing to it).
@@ -255,7 +263,7 @@ namespace DX
         m_objects.erase(object);
     }
 
-    void Renderer::UpdateFrameData()
+    void Renderer::UpdateFrameData(Vulkan::FrameBuffer* frameBuffer)
     {
         // Update ViewProj uniform buffer
         const ViewProjBuffer viewProjBuffer(
@@ -271,13 +279,19 @@ namespace DX
         {
             Vulkan::PipelineDescriptorSet* objectDescriptorSet = m_perObjectDescritorSets[m_currentFrame][objectIndex].get();
 
-            objectDescriptorSet->SetSampler(0, object->GetSampler().get());
-            objectDescriptorSet->SetImageView(1, object->GetDiffuseImageView().get());
-            objectDescriptorSet->SetImageView(2, object->GetEmissiveImageView().get());
-            objectDescriptorSet->SetImageView(3, object->GetNormalImageView().get());
+            objectDescriptorSet->SetShaderSampler(0, object->GetSampler().get());
+            objectDescriptorSet->SetShaderSampledImageView(1, object->GetDiffuseImageView().get());
+            objectDescriptorSet->SetShaderSampledImageView(2, object->GetEmissiveImageView().get());
+            objectDescriptorSet->SetShaderSampledImageView(3, object->GetNormalImageView().get());
 
             ++objectIndex;
         }
+
+        // Update the Pipeline Descriptor Sets with the Input Attachments
+        Vulkan::ImageView* colorAttachment = frameBuffer->GetImageView(1);
+        Vulkan::ImageView* depthStencilAttachment = frameBuffer->GetImageView(2);
+        m_inputAttachmentsDescritorSets[m_currentFrame]->SetShaderInputAttachment(0, colorAttachment);
+        m_inputAttachmentsDescritorSets[m_currentFrame]->SetShaderInputAttachment(1, depthStencilAttachment);
     }
 
     void Renderer::RecordCommands(Vulkan::FrameBuffer* frameBuffer)
@@ -303,36 +317,52 @@ namespace DX
         if (commandBuffer->Begin())
         {
             commandBuffer->BeginRenderPass(frameBuffer,
-                { Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f) },
+                Math::CreateColor(Math::Colors::SteelBlue.xyz() * 0.7f),
                 1.0f);
 
-            commandBuffer->BindPipeline(m_pipeline.get());
-
-            // Bind per scene pipeline descriptor set, which includes the ViewProj uniform buffer.
-            commandBuffer->BindPipelineDescriptorSet(m_perSceneDescritorSets[m_currentFrame].get());
-
-            for (uint32_t objectIndex = 0;
-                auto* object : m_objects)
+            // Subpass 0
             {
-                // Bind per object pipeline descriptor set, which includes the images and sampler.
-                commandBuffer->BindPipelineDescriptorSet(m_perObjectDescritorSets[m_currentFrame][objectIndex].get());
+                commandBuffer->BindPipeline(m_pipelines[0].get());
 
-                // Push per object World data to the pipeline.
-                const WorldBuffer worldBuffer = {
-                    .m_worldMatrix = object->GetTransform().ToMatrix(),
-                    .m_inverseTransposeWorldMatrix = object->GetTransform().ToMatrix().Inverse().Transpose()
-                };
-                commandBuffer->PushConstantsToPipeline(
-                    m_pipeline.get(), Vulkan::ShaderType_Vertex | Vulkan::ShaderType_Fragment, &worldBuffer, sizeof(worldBuffer));
+                // Bind per scene pipeline descriptor set, which includes the ViewProj uniform buffer.
+                commandBuffer->BindPipelineDescriptorSet(m_perSceneDescritorSets[m_currentFrame].get());
 
-                // Bind Vertex and Index Buffers
-                commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });
-                commandBuffer->BindIndexBuffer(object->GetIndexBuffer().get());
+                for (uint32_t objectIndex = 0;
+                    auto* object : m_objects)
+                {
+                    // Bind per object pipeline descriptor set, which includes the images and sampler.
+                    commandBuffer->BindPipelineDescriptorSet(m_perObjectDescritorSets[m_currentFrame][objectIndex].get());
 
-                // Draw
-                commandBuffer->DrawIndexed(object->GetIndexCount());
+                    // Push per object World data to the pipeline.
+                    const WorldBuffer worldBuffer = {
+                        .m_worldMatrix = object->GetTransform().ToMatrix(),
+                        .m_inverseTransposeWorldMatrix = object->GetTransform().ToMatrix().Inverse().Transpose()
+                    };
+                    commandBuffer->PushConstantsToPipeline(
+                        m_pipelines[0].get(), Vulkan::ShaderType_Vertex | Vulkan::ShaderType_Fragment, &worldBuffer, sizeof(worldBuffer));
 
-                ++objectIndex;
+                    // Bind Vertex and Index Buffers
+                    commandBuffer->BindVertexBuffers({ object->GetVertexBuffer().get() });
+                    commandBuffer->BindIndexBuffer(object->GetIndexBuffer().get());
+
+                    // Draw
+                    commandBuffer->DrawIndexed(object->GetIndexCount());
+
+                    ++objectIndex;
+                }
+            }
+
+            commandBuffer->NextSubpass();
+
+            // Subpass 1
+            {
+                commandBuffer->BindPipeline(m_pipelines[1].get());
+
+                // Bind input attachments pipeline descriptor set, which includes the color and depth input images.
+                commandBuffer->BindPipelineDescriptorSet(m_inputAttachmentsDescritorSets[m_currentFrame].get());
+
+                // Draw 3 vertices, the vertex positions are handled by the vertex shader, there is no vertex data to bind.
+                commandBuffer->Draw(3);
             }
 
             commandBuffer->EndRenderPass();
@@ -381,8 +411,38 @@ namespace DX
 
     bool Renderer::CreateRenderPass()
     {
-        m_renderPass = std::make_unique<Vulkan::RenderPass>(m_device.get(),
-            m_swapChain->GetImageFormat(), m_swapChain->GetDepthStencilFormat());
+        // Choose the most appropriate color format
+        m_frameBufferColorFormat = Vulkan::ChooseSupportedFormat(m_device.get(),
+            { Vulkan::ResourceFormat::R8G8B8A8_UNORM },
+            Vulkan::ImageTiling::Optimal,
+            VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+        );
+        if (m_frameBufferColorFormat == Vulkan::ResourceFormat::Unknown)
+        {
+            DX_LOG(Error, "Renderer", "Failed to find a supported color format for frame buffer.");
+            return false;
+        }
+
+        // Choose the most appropriate depth format
+        m_frameBufferDepthStencilFormat = Vulkan::ChooseSupportedFormat(m_device.get(),
+            { Vulkan::ResourceFormat::D32_SFLOAT_S8_UINT, Vulkan::ResourceFormat::D24_UNORM_S8_UINT },
+            Vulkan::ImageTiling::Optimal,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
+        if (m_frameBufferDepthStencilFormat == Vulkan::ResourceFormat::Unknown)
+        {
+            DX_LOG(Error, "Renderer", "Failed to find a supported depth-stencil format for frame buffer.");
+            return false;
+        }
+
+        Vulkan::RenderPassDesc renderPassDesc = {};
+        renderPassDesc.m_attachments = {
+            m_swapChain->GetImageFormat(),
+            m_frameBufferColorFormat,
+            m_frameBufferDepthStencilFormat
+        };
+
+        m_renderPass = std::make_unique<Vulkan::RenderPass>(m_device.get(), renderPassDesc);
 
         if (!m_renderPass->Initialize())
         {
@@ -395,25 +455,110 @@ namespace DX
 
     bool Renderer::CreateFrameBuffers()
     {
-        if (!m_swapChain->CreateFrameBuffers(m_renderPass.get()))
+        std::vector<std::shared_ptr<Vulkan::Image>> swapChainImages = m_swapChain->ObtainImagesFromSwapChain();
+        if (swapChainImages.empty())
         {
-            DX_LOG(Error, "Renderer", "Failed to create frame buffers for the swap chain.");
+            DX_LOG(Error, "Renderer", "Failed to obtain Vulkan SwapChain Images.");
             return false;
+        }
+
+        m_frameBuffers.resize(swapChainImages.size());
+        for (int i = 0; i < swapChainImages.size(); ++i)
+        {
+            // Create Color Image
+            std::shared_ptr<Vulkan::Image> colorImage;
+            {
+                Vulkan::ImageDesc colorImageDesc = {};
+                colorImageDesc.m_imageType = Vulkan::ImageType::Image2D;
+                colorImageDesc.m_dimensions = Math::Vector3Int(m_swapChain->GetImageSize(), 1);
+                colorImageDesc.m_mipCount = 1;
+                colorImageDesc.m_format = m_frameBufferColorFormat;
+                colorImageDesc.m_tiling = Vulkan::ImageTiling::Optimal;
+                colorImageDesc.m_usageFlags = Vulkan::ImageUsage_ColorAttachment | Vulkan::ImageUsage_InputAttachment;
+
+                colorImage = std::make_shared<Vulkan::Image>(m_device.get(), colorImageDesc);
+                if (!colorImage->Initialize())
+                {
+                    DX_LOG(Error, "Renderer", "Failed to create Vulkan Image for Color Attachment.");
+                    return false;
+                }
+            }
+
+            // Create DepthStencil Image
+            std::shared_ptr<Vulkan::Image> depthStencilImage;
+            {
+                Vulkan::ImageDesc depthStencilImageDesc = {};
+                depthStencilImageDesc.m_imageType = Vulkan::ImageType::Image2D;
+                depthStencilImageDesc.m_dimensions = Math::Vector3Int(m_swapChain->GetImageSize(), 1);
+                depthStencilImageDesc.m_mipCount = 1;
+                depthStencilImageDesc.m_format = m_frameBufferDepthStencilFormat;
+                depthStencilImageDesc.m_tiling = Vulkan::ImageTiling::Optimal;
+                depthStencilImageDesc.m_usageFlags = Vulkan::ImageUsage_DepthStencilAttachment | Vulkan::ImageUsage_InputAttachment;
+
+                depthStencilImage = std::make_shared<Vulkan::Image>(m_device.get(), depthStencilImageDesc);
+                if (!depthStencilImage->Initialize())
+                {
+                    DX_LOG(Error, "Renderer", "Failed to create Vulkan Image for Depth Attachment.");
+                    return false;
+                }
+            }
+
+            // Create Frame Buffer
+            {
+                Vulkan::FrameBufferDesc frameBufferDesc = {};
+                frameBufferDesc.m_renderPass = m_renderPass.get();
+                frameBufferDesc.m_attachments = {
+                    {
+                        swapChainImages[i],
+                        swapChainImages[i]->GetImageDesc().m_format,
+                        Vulkan::ImageViewAspect_Color
+                    },
+                    {
+                        colorImage,
+                        colorImage->GetImageDesc().m_format,
+                        Vulkan::ImageViewAspect_Color
+                    },
+                    {
+                        depthStencilImage,
+                        depthStencilImage->GetImageDesc().m_format,
+                        // NOTE: This attachment is used by subpass 0 as output depth attachment and
+                        //       by subpass 1 as input attachment. When used as input attachment in subpass 1
+                        //       to be read by shader, the view cannot have both depth and stencil aspects.
+                        Vulkan::ImageViewAspect_Depth //| Vulkan::ImageViewAspect_Stencil
+                    }
+                };
+
+                m_frameBuffers[i] = std::make_unique<Vulkan::FrameBuffer>(m_device.get(), frameBufferDesc);
+                if (!m_frameBuffers[i]->Initialize())
+                {
+                    DX_LOG(Error, "Renderer", "Failed to create FrameBuffer.");
+                    return false;
+                }
+            }
         }
 
         return true;
     }
 
-    bool Renderer::CreatePipeline()
+    bool Renderer::CreatePipelines()
     {
-        const uint32_t subpassIndex = 0;
         const Math::Rectangle viewport(
             Math::Vector2(0.0f, 0.0f),
             Math::Vector2(m_swapChain->GetImageSize()));
 
-        m_pipeline = std::make_unique<Vulkan::Pipeline>(m_device.get(), m_renderPass.get(), subpassIndex, viewport);
+        m_pipelines.resize(2); // 2 pipelines, one for each subpass
 
-        if (!m_pipeline->Initialize())
+        // Subpass 0
+        m_pipelines[0] = std::make_unique<Vulkan::Pipeline>(m_device.get(), m_renderPass.get(), 0, viewport);
+        if (!m_pipelines[0]->Initialize())
+        {
+            DX_LOG(Error, "Renderer", "Failed to create pipeline.");
+            return false;
+        }
+
+        // Subpass 1
+        m_pipelines[1] = std::make_unique<Vulkan::Pipeline>(m_device.get(), m_renderPass.get(), 1, viewport);
+        if (!m_pipelines[1]->Initialize())
         {
             DX_LOG(Error, "Renderer", "Failed to create pipeline.");
             return false;
@@ -479,10 +624,7 @@ namespace DX
         m_viewProjUniformBuffers.resize(Vulkan::MaxFrameDraws);
         m_perSceneDescritorSets.resize(Vulkan::MaxFrameDraws);
         m_perObjectDescritorSets.resize(Vulkan::MaxFrameDraws);
-
-        constexpr uint32_t descriptorSetIndexForPerSceneResources = 0;
-        constexpr uint32_t descriptorSetIndexForPerObjectResources = 1;
-
+        m_inputAttachmentsDescritorSets.resize(Vulkan::MaxFrameDraws);
 
         for (int i = 0; i < Vulkan::MaxFrameDraws; ++i)
         {
@@ -494,7 +636,7 @@ namespace DX
                 return false;
             }
 
-            // Per Scene resources
+            // Per Scene resources (Subpass 0)
             {
                 m_viewProjUniformBuffers[i] = std::make_unique<Vulkan::Buffer>(m_device.get(), viewProjBufferDesc);
                 if (!m_viewProjUniformBuffers[i]->Initialize())
@@ -503,7 +645,8 @@ namespace DX
                     return false;
                 }
 
-                m_perSceneDescritorSets[i] = m_pipeline->CreatePipelineDescriptorSet(descriptorSetIndexForPerSceneResources);
+                constexpr uint32_t descriptorSetIndexForPerSceneResources = 0;
+                m_perSceneDescritorSets[i] = m_pipelines[0]->CreatePipelineDescriptorSet(descriptorSetIndexForPerSceneResources);
                 if (!m_perSceneDescritorSets[i])
                 {
                     return false;
@@ -511,15 +654,16 @@ namespace DX
 
                 // Fill the Pipeline Descriptor Sets with the Uniform Buffers
                 // ViewProj uniform buffer is in layout binding 0, which internally points to shader resource binding 0.
-                m_perSceneDescritorSets[i]->SetUniformBuffer(0, m_viewProjUniformBuffers[i].get());
+                m_perSceneDescritorSets[i]->SetShaderUniformBuffer(0, m_viewProjUniformBuffers[i].get());
             }
 
-            // Per Object resources
+            // Per Object resources (Subpass 0)
             {
                 m_perObjectDescritorSets[i].resize(Vulkan::MaxObjects);
                 for (int objectIndex = 0; objectIndex < Vulkan::MaxObjects; ++objectIndex)
                 {
-                    m_perObjectDescritorSets[i][objectIndex] = m_pipeline->CreatePipelineDescriptorSet(descriptorSetIndexForPerObjectResources);
+                    constexpr uint32_t descriptorSetIndexForPerObjectResources = 1;
+                    m_perObjectDescritorSets[i][objectIndex] = m_pipelines[0]->CreatePipelineDescriptorSet(descriptorSetIndexForPerObjectResources);
                     if (!m_perObjectDescritorSets[i][objectIndex])
                     {
                         return false;
@@ -527,6 +671,19 @@ namespace DX
                 }
 
                 // Per object descriptor sets will be filled with data every frame
+            }
+
+            // Input Attachments (Subpass 1)
+            {
+                constexpr uint32_t descriptorSetIndexForInputAttachments = 0;
+                m_inputAttachmentsDescritorSets[i] = m_pipelines[1]->CreatePipelineDescriptorSet(descriptorSetIndexForInputAttachments);
+                if (!m_inputAttachmentsDescritorSets[i])
+                {
+                    return false;
+                }
+
+                // Input Attachments descriptor sets will be filled with data every frame
+
             }
         }
 

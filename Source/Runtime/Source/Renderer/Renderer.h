@@ -23,6 +23,7 @@ namespace Vulkan
     class Buffer;
     class PipelineDescriptorSet;
     class CommandBuffer;
+    enum class ResourceFormat;
 }
 
 namespace DX
@@ -61,7 +62,7 @@ namespace DX
         void RemoveObject(Object* object);
 
     private:
-        void UpdateFrameData();
+        void UpdateFrameData(Vulkan::FrameBuffer* frameBuffer);
         void RecordCommands(Vulkan::FrameBuffer* frameBuffer);
 
         RendererId m_rendererId;
@@ -119,10 +120,13 @@ namespace DX
     private:
         bool CreateRenderPass();
         bool CreateFrameBuffers();
-        bool CreatePipeline();
+        bool CreatePipelines();
 
         std::unique_ptr<Vulkan::RenderPass> m_renderPass;
-        std::unique_ptr<Vulkan::Pipeline> m_pipeline;
+        Vulkan::ResourceFormat m_frameBufferColorFormat;
+        Vulkan::ResourceFormat m_frameBufferDepthStencilFormat;
+        std::vector<std::unique_ptr<Vulkan::FrameBuffer>> m_frameBuffers; // One per SwapChain image
+        std::vector<std::unique_ptr<Vulkan::Pipeline>> m_pipelines; // 2 pipelines, one for each subpass
 
     private:
         // ---------------------------
@@ -156,12 +160,15 @@ namespace DX
         // Command buffers for sending commands to each swap chain frame buffer.
         std::vector<std::unique_ptr<Vulkan::CommandBuffer>> m_commandBuffers; // One per frame
 
-        // Per Scene resources
+        // Per Scene resources (Subpass 0)
         std::vector<std::unique_ptr<Vulkan::Buffer>> m_viewProjUniformBuffers; // One per frame
         std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_perSceneDescritorSets; // One per frame
 
-        // Per Object resources
+        // Per Object resources (Subpass 0)
         using PipelineDescriptorSetsForObjects = std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>>; // MaxObjects elements
         std::vector<PipelineDescriptorSetsForObjects> m_perObjectDescritorSets; // One per frame
+
+        // Input Attachments (Subpass 1)
+        std::vector<std::shared_ptr<Vulkan::PipelineDescriptorSet>> m_inputAttachmentsDescritorSets; // One per frame
     };
 } // namespace DX

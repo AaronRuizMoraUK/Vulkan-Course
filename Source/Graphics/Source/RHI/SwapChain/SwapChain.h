@@ -33,16 +33,11 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
-        bool CreateFrameBuffers(RenderPass* renderPass);
-        void DestroyFrameBuffers();
-
+        uint32_t GetImageCount() const;
         ResourceFormat GetImageFormat() const;
         const Math::Vector2Int& GetImageSize() const;
 
-        ResourceFormat GetDepthStencilFormat() const;
-
-        uint32_t GetImageCount() const;
-        FrameBuffer* GetFrameBuffer(uint32_t imageIndex);
+        std::vector<std::shared_ptr<Image>> ObtainImagesFromSwapChain();
 
         VkSwapchainKHR GetVkSwapChain();
 
@@ -51,17 +46,11 @@ namespace Vulkan
 
     private:
         bool CreateVkSwapChain();
-        std::vector<std::shared_ptr<Image>> ObtainImagesFromSwapChain();
 
         VkSwapchainKHR m_vkSwapChain = nullptr;
 
         uint32_t m_imageCount = 0;
         ResourceFormat m_imageFormat = ResourceFormat::Unknown;
         Math::Vector2Int m_imageSize = Math::Vector2Int(0);
-
-        ResourceFormat m_depthStencilFormat = ResourceFormat::Unknown;
-
-        // Frame buffers for drawing into each swap chain image.
-        std::vector<std::unique_ptr<FrameBuffer>> m_frameBuffers;
     };
 } // namespace Vulkan

@@ -10,10 +10,9 @@
 
 namespace Vulkan
 {
-    RenderPass::RenderPass(Device* device, ResourceFormat colorFormat, ResourceFormat depthStencilFormat)
+    RenderPass::RenderPass(Device* device, const RenderPassDesc& desc)
         : m_device(device)
-        , m_colorFormat(colorFormat)
-        , m_depthStencilFormat(depthStencilFormat)
+        , m_desc(desc)
     {
     }
 
@@ -57,6 +56,11 @@ namespace Vulkan
     {
         // TODO: Client code needs to be able to configure all this from a RenderPassDesc structure
         //       and not being hard-coded here.
+        if (m_desc.m_attachments.size() != 3)
+        {
+            DX_LOG(Fatal, "Vulkan RenderPass", "Expected 3 attachments.");
+            return false;
+        }
 
         // About image layouts in attachments
         // 
@@ -72,24 +76,38 @@ namespace Vulkan
 
         // Attachments of the render pass
         const std::vector<VkAttachmentDescription> attachments = {
-            // 0) Color Attachment
+            // 0) SwapChain Image Attachment of Subpass 1
             {
                 .flags = 0,
-                .format = ToVkFormat(m_colorFormat), // Format to use for attachment
+                .format = ToVkFormat(m_desc.m_attachments[0]), // Format to use for attachment
                 .samples = VK_SAMPLE_COUNT_1_BIT, // Number of samples to write for MSAA
 
-                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // What to do with attachment before rendering
-                .storeOp = VK_ATTACHMENT_STORE_OP_STORE, // What to do with attachment after rendering
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // What to do with attachment before render pass starts
+                .storeOp = VK_ATTACHMENT_STORE_OP_STORE, // What to do with attachment after render pass finishes
                 .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
                 .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 
                 .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED, // Image data layout expected before render pass starts
                 .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR // Image data layout to convert to after render pass finishes
             },
-            // 1) Depth/Stencil Attachment
+            // 1) Color Attachment of Subpass 0 and Input Attachment to Subpass 1
             {
                 .flags = 0,
-                .format = ToVkFormat(m_depthStencilFormat),
+                .format = ToVkFormat(m_desc.m_attachments[1]), // Format to use for attachment
+                .samples = VK_SAMPLE_COUNT_1_BIT, // Number of samples to write for MSAA
+
+                .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR, // What to do with attachment before render pass starts
+                .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE, // What to do with attachment after render pass finishes
+                .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+
+                .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED, // Image data layout expected before render pass starts
+                .finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL // Image data layout to convert to after render pass finishes
+            },
+            // 2) Depth/Stencil Attachment of Subpass 0
+            {
+                .flags = 0,
+                .format = ToVkFormat(m_desc.m_attachments[2]),
                 .samples = VK_SAMPLE_COUNT_1_BIT,
 
                 .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -112,29 +130,68 @@ namespace Vulkan
         //       The render pass defines them all, the subpasses indicates which ones are used.
         const std::vector<VkAttachmentReference> colorAttachmentReferences = {
             {
-                .attachment = 0, // Index of the attachment inside vkRenderPassCreateInfo.pAttachments
+                .attachment = 1, // Index of the attachment inside vkRenderPassCreateInfo.pAttachments
                 .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL  // Image data layout to convert to before render subpass starts
             }
         };
         const VkAttachmentReference depthStencilAttachmentReference = {
-            .attachment = 1,
+            .attachment = 2,
             .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
         };
+        const std::vector<VkAttachmentReference> swapChainAttachmentReferences = {
+            {
+                .attachment = 0, // Index of the attachment inside vkRenderPassCreateInfo.pAttachments
+                .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL  // Image data layout to convert to before render subpass starts
+            }
+        };
+        const std::vector<VkAttachmentReference> inputAttachmentReferences = {
+            {
+                .attachment = 1, // Index of the attachment inside vkRenderPassCreateInfo.pAttachments
+                .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL  // Image data layout to convert to before render subpass starts
+            },
+            {
+                .attachment = 2, // Index of the attachment inside vkRenderPassCreateInfo.pAttachments
+                .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL  // Image data layout to convert to before render subpass starts
+            }
+        };
 
-        const VkSubpassDescription subpass = {
-            .flags = 0,
-            .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS, // What pipeline the subpass is to be bound to
-            .inputAttachmentCount = 0,
-            .pInputAttachments = nullptr,
-            .colorAttachmentCount = static_cast<uint32_t>(colorAttachmentReferences.size()),
-            .pColorAttachments = colorAttachmentReferences.data(),
-            .pResolveAttachments = 0,
-            .pDepthStencilAttachment = &depthStencilAttachmentReference,
-            .preserveAttachmentCount = 0,
-            .pPreserveAttachments = nullptr
+        const std::vector<VkSubpassDescription> subpasses = {
+            // Subpass 0
+            {
+                .flags = 0,
+                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS, // What pipeline the subpass is to be bound to
+                .inputAttachmentCount = 0,
+                .pInputAttachments = nullptr,
+                .colorAttachmentCount = static_cast<uint32_t>(colorAttachmentReferences.size()),
+                .pColorAttachments = colorAttachmentReferences.data(),
+                .pResolveAttachments = 0,
+                .pDepthStencilAttachment = &depthStencilAttachmentReference,
+                .preserveAttachmentCount = 0,
+                .pPreserveAttachments = nullptr
+            },
+            // Subpass 1
+            {
+                .flags = 0,
+                .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS, // What pipeline the subpass is to be bound to
+                .inputAttachmentCount = static_cast<uint32_t>(inputAttachmentReferences.size()),
+                .pInputAttachments = inputAttachmentReferences.data(),
+                .colorAttachmentCount = static_cast<uint32_t>(swapChainAttachmentReferences.size()),
+                .pColorAttachments = swapChainAttachmentReferences.data(),
+                .pResolveAttachments = 0,
+                .pDepthStencilAttachment = nullptr,
+                .preserveAttachmentCount = 0,
+                .pPreserveAttachments = nullptr
+            }
         };
 
         // Subpass dependency
+        // 
+        // TODO: Confirm the following: Subpass dependencies are only needed when needed
+        //       to specify between exact stages the transition need to happen. If no
+        //       subpass dependencies are generated then the transition will happen implicitly
+        //       between subpasses. It'd be the same as specifying subpass dependencies of
+        //       "layout conversion can start after end of previous pass and must finish before
+        //       the beginning of the next pass".
         // 
         // A subpass dependency is needed to determine when layout transitions occur.
         // It does implicit layout transitions, the attachments have WHAT layouts
@@ -161,11 +218,15 @@ namespace Vulkan
         // The following website lists all the Access Mask values allowed and in what stages they can be used:
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAccessFlagBits.html
         //
-        std::array<VkSubpassDependency, 2> subpassDependencies;
+        std::array<VkSubpassDependency, 3> subpassDependencies;
 
-        // Layout Conversion 1: VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        // Layout in subpass external (undefined) -> Layout in subpass 0 (color/depth attachment)
         // Start after: End of whatever came before
         // Finish before: Color Output stage in subpass 0
+        // 
+        // TODO: This might not be necessary because the color/depth images doesn't have any dependency
+        //       with previous executions or commands and therefore its layout transition can be done
+        //       automatically without having to specify a subpass dependency.
         subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
         subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
         subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT; // Conversion has to start after: it has to be read from
@@ -174,16 +235,38 @@ namespace Vulkan
         subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to finish before: reading or writing to it
         subpassDependencies[0].dependencyFlags = 0;
 
-        // Layout Conversion 2: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+        // Layout in subpass 0 (color/depth attachment) -> Layout in subpass 1 (shader read)
         // Start after: Color Output stage in subpass 0
-        // Finish before: Whatever comes after tries to read from it
+        // Finish before: Fragment shader stage in subpass 1
+        // 
+        // TODO: This might not be necessary because the color/depth images doesn't have any dependency
+        //       with previous executions or commands and therefore its layout transition can be done
+        //       automatically without having to specify a subpass dependency.
         subpassDependencies[1].srcSubpass = 0;
         subpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        subpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to start after: reading or writing to it
-        subpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-        subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        subpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to start after: writing to it
+        subpassDependencies[1].dstSubpass = 1;
+        subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT; // Conversion has to finish before: it has to be read from
         subpassDependencies[1].dependencyFlags = 0;
+
+        // TODO: Missing Layout in subpass external (undefined) -> Layout in subpass 1 (swap-chain color attachment)
+        //       Otherwise the clear operation for swap-chain's image might happen before the image is available.
+
+        // Layout in subpass 1 (swap-chain color attachment) -> Layout in subpass external (present)
+        // Start after: Color Output stage in subpass 1
+        // Finish before: Whatever comes after tries to read from it
+        // 
+        // TODO: This might not be necessary because the present function is waiting with a semaphore that the
+        //       commands have finished and therefore the render pass have finished and the transition to present
+        //       layout would have happen implicitly.
+        subpassDependencies[2].srcSubpass = 1;
+        subpassDependencies[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to start after: reading or writing to it
+        subpassDependencies[2].dstSubpass = VK_SUBPASS_EXTERNAL;
+        subpassDependencies[2].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        subpassDependencies[2].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT; // Conversion has to finish before: it has to be read from
+        subpassDependencies[2].dependencyFlags = 0;
 
         // -----------
         // Render Pass
@@ -210,8 +293,8 @@ namespace Vulkan
         vkRenderPassCreateInfo.flags = 0;
         vkRenderPassCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         vkRenderPassCreateInfo.pAttachments = attachments.data();
-        vkRenderPassCreateInfo.subpassCount = 1;
-        vkRenderPassCreateInfo.pSubpasses = &subpass;
+        vkRenderPassCreateInfo.subpassCount = static_cast<uint32_t>(subpasses.size());
+        vkRenderPassCreateInfo.pSubpasses = subpasses.data();
         vkRenderPassCreateInfo.dependencyCount = static_cast<uint32_t>(subpassDependencies.size());
         vkRenderPassCreateInfo.pDependencies = subpassDependencies.data();
 

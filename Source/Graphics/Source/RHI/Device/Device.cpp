@@ -468,11 +468,14 @@ namespace Vulkan
     bool Device::CreateVkDescriptorPool()
     {
         // Increase max counts as needed
-        constexpr int maxDescriptorSetsPerFrame = 1 + MaxObjects; // Per Scene set + Per Object sets
+        constexpr int maxDescriptorSetsPerFrame = 
+            (1 + MaxObjects) + // Subpass 0 = (Per Scene set + Per Object sets)
+            (1);               // Subpass 1 = (Input Attachments set)
         constexpr int maxUniformBufferDescriptorsPerFrame = 1; // Per scene data
         //constexpr int maxUniformBufferDynamicDescriptorsPerFrame = 1; // Per object data putting all into 1 dynamic uniform buffer
         constexpr int maxImageDescriptorsPerFrame = 3 * MaxObjects; // 3 image (Diffuse, Normal and Emissive) per object
         constexpr int maxSamplerDescriptorsPerFrame = 1 * MaxObjects; // 1 sampler per object
+        constexpr int maxInputAttachmentDescriptorsPerFrame = 2; // color and depth
 
         // Max number of descriptor sets in the pool.
         // Descriptor sets contain descriptors. A descriptor can be used in different descriptor sets.
@@ -495,6 +498,10 @@ namespace Vulkan
             {
                 .type = VK_DESCRIPTOR_TYPE_SAMPLER,
                 .descriptorCount = MaxFrameDraws * maxSamplerDescriptorsPerFrame
+            },
+            {
+                .type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+                .descriptorCount = MaxFrameDraws * maxInputAttachmentDescriptorsPerFrame
             },
         };
 

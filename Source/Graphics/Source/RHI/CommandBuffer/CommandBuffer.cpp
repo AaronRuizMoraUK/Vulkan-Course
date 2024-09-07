@@ -92,49 +92,33 @@ namespace Vulkan
 
     void CommandBuffer::BeginRenderPass(
         FrameBuffer* frameBuffer,
-        std::vector<Math::Color> clearColors,
+        std::optional<Math::Color> clearColor,
         std::optional<float> clearDepth,
         std::optional<uint8_t> clearStencil)
     {
-        const size_t numColorAttachments = frameBuffer->GetFrameBufferDesc().m_colorAttachments.size();
-        const bool hasDepthStencilAttachment = frameBuffer->GetFrameBufferDesc().m_depthStencilAttachment.m_image != nullptr;
-        const Math::Vector2Int& frameBufferDimensions = frameBuffer->GetDimensions();
-
-        if (numColorAttachments != clearColors.size())
-        {
-            DX_LOG(Warning, "Vulkan CommandBuffer", 
-                "Frame buffer has %d color attachments but %d clear color values were provided.",
-                numColorAttachments, clearColors.size());
-        }
-
-        if (hasDepthStencilAttachment && !clearDepth.has_value() && !clearStencil.has_value())
-        {
-            DX_LOG(Warning, "Vulkan CommandBuffer",
-                "Frame buffer has a depth stencil attachment but no clear values for depth or stencil were provided.");
-        }
-
         // Clear values needs to match 1:1 with attachments in frame buffer
+        // TODO: Pass a list of clear values, instead of using the same for color and depth.
 
-        std::vector<VkClearValue> clearValues;
-        for (size_t i = 0; i < numColorAttachments; ++i)
-        {
-            const VkClearValue colorClearValue = {
-                .color = (i < clearColors.size())
-                    ? VkClearColorValue{ clearColors[i].x, clearColors[i].y, clearColors[i].z, clearColors[i].w }
-                    : VkClearColorValue{ 0.0f, 0.0f, 0.0f, 1.0f }
-            };
-            clearValues.push_back(colorClearValue);
-        }
+        const Math::Vector2Int& frameBufferDimensions = frameBuffer->GetDimensions();
+        const std::vector<ImageAttachment>& frameBufferAttachments = frameBuffer->GetFrameBufferDesc().m_attachments;
 
-        if (hasDepthStencilAttachment)
+        std::vector<VkClearValue> clearValues(frameBufferAttachments.size());
+        for (size_t i = 0; i < frameBufferAttachments.size(); ++i)
         {
-            const VkClearValue depthStencilClearValue = {
-                .depthStencil = {
+            // Color?
+            if (frameBufferAttachments[i].m_viewAspectFlags & ImageViewAspect_Color)
+            {
+                const Math::Color color = clearColor.value_or(Math::Color(0.0f, 0.0f, 0.0f, 1.0f));
+                clearValues[i].color = VkClearColorValue{ color.x, color.y, color.z, color.w };
+            }
+            // Depth or Stencil?
+            else if (frameBufferAttachments[i].m_viewAspectFlags & (ImageViewAspect_Depth | ImageViewAspect_Stencil))
+            {
+                clearValues[i].depthStencil = VkClearDepthStencilValue {
                     .depth = clearDepth.value_or(1.0f),
                     .stencil = clearStencil.value_or(0)
-                }
-            };
-            clearValues.push_back(depthStencilClearValue);
+                };
+            }
         }
 
         // Information about how to begin a render pass (only needed for graphics operations)
@@ -158,6 +142,12 @@ namespace Vulkan
     void CommandBuffer::EndRenderPass()
     {
         vkCmdEndRenderPass(m_vkCommandBuffer);
+    }
+
+    void CommandBuffer::NextSubpass()
+    {
+        // All the commands are going to be inline draws (no secondary level command buffers)
+        vkCmdNextSubpass(m_vkCommandBuffer, VK_SUBPASS_CONTENTS_INLINE);
     }
 
     void CommandBuffer::BindPipeline(Pipeline* pipeline)
@@ -263,6 +253,14 @@ namespace Vulkan
         }
 
         vkCmdBindIndexBuffer(m_vkCommandBuffer, indexBuffer->GetVkBuffer(), 0, vkIndexType);
+    }
+
+
+    void CommandBuffer::Draw(
+        uint32_t vertexCount, uint32_t firstVertex,
+        uint32_t instanceCount, uint32_t firstInstance)
+    {
+        vkCmdDraw(m_vkCommandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
     }
 
     void CommandBuffer::DrawIndexed(

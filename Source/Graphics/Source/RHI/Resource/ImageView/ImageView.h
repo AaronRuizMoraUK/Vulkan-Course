@@ -20,7 +20,7 @@ namespace Vulkan
         bool Initialize();
         void Terminate();
 
-        const ImageViewDesc& GetImageDesc() const { return m_desc; }
+        const ImageViewDesc& GetImageViewDesc() const { return m_desc; }
 
         VkImageView GetVkImageView();
 

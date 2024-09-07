@@ -1,6 +1,6 @@
 #pragma once
 
-#include <RHI/Resource/ResourceEnums.h>
+#include <RHI/RenderPass/RenderPassDesc.h>
 
 #include <vector>
 
@@ -14,7 +14,7 @@ namespace Vulkan
     class RenderPass
     {
     public:
-        RenderPass(Device* device, ResourceFormat colorFormat, ResourceFormat depthStencilFormat);
+        RenderPass(Device* device, const RenderPassDesc& desc);
         ~RenderPass();
 
         RenderPass(const RenderPass&) = delete;
@@ -27,8 +27,7 @@ namespace Vulkan
 
     private:
         Device* m_device = nullptr;
-        ResourceFormat m_colorFormat = ResourceFormat::Unknown;
-        ResourceFormat m_depthStencilFormat = ResourceFormat::Unknown;
+        RenderPassDesc m_desc;
 
     private:
         bool CreateVkRenderPass();

@@ -53,10 +53,12 @@ namespace Vulkan
         // Begin a render pass to an specific frame buffer.
         // The render pass is obtained from the frame buffer as it stores which render pass is compatible with.
         void BeginRenderPass(FrameBuffer* frameBuffer,
-            std::vector<Math::Color> clearColors,
+            std::optional<Math::Color> clearColor = std::nullopt,
             std::optional<float> clearDepth = std::nullopt,
             std::optional<uint8_t> clearStencil = std::nullopt);
         void EndRenderPass();
+
+        void NextSubpass();
 
         // Sets which pipeline the render pass will use when calling draw.
         // The pipeline needs to compatible with the render pass.
@@ -74,8 +76,8 @@ namespace Vulkan
         void BindVertexBuffers(const std::vector<Buffer*>& vertexBuffers);
         void BindIndexBuffer(Buffer* indexBuffer);
 
-        void DrawIndexed(uint32_t indexCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0,
-            uint32_t instanceCount = 1, uint32_t firstInstance = 0);
+        void Draw(uint32_t vertexCount, uint32_t firstVertex = 0, uint32_t instanceCount = 1, uint32_t firstInstance = 0);
+        void DrawIndexed(uint32_t indexCount, uint32_t firstIndex = 0, uint32_t vertexOffset = 0, uint32_t instanceCount = 1, uint32_t firstInstance = 0);
 
         // -- Transfer commands --
 
