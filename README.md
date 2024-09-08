@@ -4,9 +4,9 @@
 
 Project generated while doing the Udemy course *[Learn the Vulkan API with C++](https://www.udemy.com/course/learn-the-vulkan-api-with-cpp/)* by Ben Cook.
 
-This branch contains all the code generated up to *Lecture 28: Model Loading* where we can load and render several models with different textures.
+This branch contains all the code generated up to *Lecture 28: Model Loading*, where we can load and render several models with different textures. This is the last lecture using a render pass with a single subpass. In subsequent lectures a larger refactor is done to use multiple subpasses.
 
-Special emphasis has been placed on modularity, separating the Vulkan code into its own library. All the different graphics concepts have been encapsulated in different classes, making easy to read and understand, see [Rendering Engine Architecture](#Rendering-Engine-Architecture) section for more details. Also, additional improvements have been added on top of the course content (see [Vulkan Course Improvements](#Vulkan-Course-Improvements) section).
+To enhance modularity, I separated the Vulkan code into its own dedicated library. I have also encapsulated various graphics concepts into distinct classes, improving readability and maintainability. For more details, refer to the [Rendering Engine Architecture](#Rendering-Engine-Architecture) section. Additionally, further improvements beyond the course content have been implemented, see [Vulkan Course Improvements](#Vulkan-Course-Improvements) section for more details.
 
 <img src="./Vulkan_GraphicsEngine.gif">
 
@@ -87,11 +87,6 @@ graphics. The renderer will get the view/projection matrices from the camera and
 - Implemented [Normal mapping](https://learnopengl.com/Advanced-Lighting/Normal-Mapping) to provide more detailed surfaces to objects.
 - Implemented [Directional lighting](https://learnopengl.com/Lighting/Multiple-lights) in Fragment Shader.
 - Implemented [Gamma Correction](https://learnopengl.com/Advanced-Lighting/Gamma-Correction) in Fragment Shader for a better quality image due to more accurate lighting calculations in linear space.
-
-#### Assets
- 
-- Assets only have generic data imported from the files in the Assets folder, they do not include Vulkan or Graphics structures. For example, `TextureAsset` has a buffer of bytes with the image imported from file, but it doesn't include a graphics' `Texture`. Another example is `MeshAsset`, it has the list of positions, indices, etc. imported from FBX or GLTF files, but it doesn't include a graphics' `Buffer`. This keeps the assets system nicely decoupled from graphics structures. Other classes, such as Renderer's `Object`, will use the assets, load their data and then construct their necessary structures from them.
-- `MeshAsset` imports all meshes from the 3D file and not just the first one.
 
 ## 3rdParty Libraries
 
