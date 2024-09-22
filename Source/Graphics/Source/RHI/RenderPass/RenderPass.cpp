@@ -183,7 +183,7 @@ namespace Vulkan
         // The following website lists all the Access Mask values allowed and in what stages they can be used:
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAccessFlagBits.html
         //
-        std::array<VkSubpassDependency, 2> subpassDependencies;
+        std::array<VkSubpassDependency, 1> subpassDependencies;
 
         // In our case we need on dependency because the implicit layout transition from
         // VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL happens before the subpass starts,
