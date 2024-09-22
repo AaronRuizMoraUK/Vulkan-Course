@@ -71,8 +71,11 @@ namespace Vulkan
         // and they indicate the layout the image has to be and the layout the image has changed to 
         // when the passes and subpasses are being executed.
         //
-        // In our responsibility to specify the correct image layouts for the images while they
+        // It's our responsibility to specify the correct image layouts for the images while they
         // are being used by render passes and subpasses.
+        //
+        // Special keywords to be aware of:
+        // - Layout VK_IMAGE_LAYOUT_UNDEFINED: It means "we don't care what previous layout the image was in".
 
         // Attachments of the render pass
         const std::vector<VkAttachmentDescription> attachments = {
@@ -125,6 +128,17 @@ namespace Vulkan
         // A subpass has references to Render Pass's attachment descriptors (vkRenderPassCreateInfo.pAttachments),
         // not the attachment descriptors themselves. The reference is specify with an Attachment Reference, where
         // indices to vkRenderPassCreateInfo.pAttachments are specified.
+        // 
+        // A subpass also specifies the layout expected for the attachment. There are 2 implicit layout transitions that
+        // happen automatically:
+        // 1) Between the render pass initial layout to the fist subpass layout 
+        // 2) Between the last subpass layout to render pass final layout.
+        // 
+        // The implicit transition 1) will happen before the subpass starts and before the clear operation (which happens before the attachment is used within the pipeline)
+        // The implicit transition 2) will happen after it's written by the subpass' pipeline and before the store operation.
+        // 
+        // IMPORTANT ==> But it will NOT do layout transition between subpasses!! If 2 subpasses specify different layouts for the same
+        // attachment, then a subpass dependency is necessary.
         //
         // NOTE: A subpass doesn't have to use all attachments defined in the render pass.
         //       The render pass defines them all, the subpasses indicates which ones are used.
@@ -186,31 +200,32 @@ namespace Vulkan
 
         // Subpass dependency
         // 
-        // TODO: Confirm the following: Subpass dependencies are only needed when needed
-        //       to specify between exact stages the transition need to happen. If no
-        //       subpass dependencies are generated then the transition will happen implicitly
-        //       between subpasses. It'd be the same as specifying subpass dependencies of
-        //       "layout conversion can start after end of previous pass and must finish before
-        //       the beginning of the next pass".
+        // Vulkan guarantees subpass execution order if they have attachment dependencies (if one subpass writes to an attachment 
+        // and another has it as input), but if subpasses are independent (don't share attachments or resources) then they might
+        // execute in parallel.
         // 
-        // A subpass dependency is needed to determine when layout transitions occur.
-        // It does implicit layout transitions, the attachments have WHAT layouts
-        // to have, but with the subpass dependency we indicate WHEN we want the
-        // layout transition operation to occur.
-        //
-        // It's our responsibility to specify the right points within the render pass when the layout
-        // transition can start and when it needs to be finished. For example, after subpass A
-        // finishes you can start the transition and be done before this subpass B starts.
-        // Notice we haven't say explicitly when the operation happens, but indicated a range in time
-        // when the GPU will need to do the operation.
+        // Also, as indicated before, layout transitions between subpasses are not implicitly handled, so subpass dependencies are required.
+        // 
+        // In summary, these are some reasons to use subpass dependencies:
+        // - To specify layout transitions between subpasses.
+        // - Explicitly synchronize subpasses when necessary.
+        // - Having a finer control to specify the points when the layout transitions need to happen.
+        // 
+        // With a subpass dependency we specify 2 points within subpasses:
+        // - Source: the point within the first subpass (dependency) after work can start.
+        // - Destination: the point within the second subpass (dependent) when work needs to be finished.
+        // 
+        // Notice we don't say explicitly when the work needs to happen, but indicated a range in time
+        // when the GPU will need to do the work.
         //
         // In the subpass dependency we specify not only between which subpasses the operation need
         // to happen, but we also specify at what stage inside the subpass' pipeline can the operation start
         // and expected to finish. For example, start after Vertex Shader of subpass A and finish before
-        // Fragment Shader of subpass B.
+        // Fragment Shader of subpass C.
         //
         // Special keywords to be aware of:
         // - Subpass index VK_SUBPASS_EXTERNAL: It means "anything that takes place outside our subpasses".
+        // - Stage Mask VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT: It means "at the beginning of the subpass' pipeline".
         // - Stage Mask VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT: It means "at the end of the subpass' pipeline".
         //
         // Finally, there is another level (beyond stage) where we can specify when operation needs to start/finish,
@@ -218,55 +233,56 @@ namespace Vulkan
         // The following website lists all the Access Mask values allowed and in what stages they can be used:
         // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkAccessFlagBits.html
         //
-        std::array<VkSubpassDependency, 3> subpassDependencies;
+        std::array<VkSubpassDependency, 1> subpassDependencies;
 
-        // Layout in subpass external (undefined) -> Layout in subpass 0 (color/depth attachment)
-        // Start after: End of whatever came before
-        // Finish before: Color Output stage in subpass 0
+        // -------------------------------
+        // Situation BEFORE when we had one subpass, which used the swap-chain image in subpass 0:
         // 
-        // TODO: This might not be necessary because the color/depth images doesn't have any dependency
-        //       with previous executions or commands and therefore its layout transition can be done
-        //       automatically without having to specify a subpass dependency.
-        subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-        subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-        subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT; // Conversion has to start after: it has to be read from
-        subpassDependencies[0].dstSubpass = 0;
-        subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to finish before: reading or writing to it
-        subpassDependencies[0].dependencyFlags = 0;
-
+        // We needed a subpass dependency because the implicit layout transition from VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        // happens before the subpass starts, so it happened before the VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage that the vkQueueSubmit will
+        // wait for to check the swap chain's semaphore. Due to that semaphore wait, the clear and write operations
+        // were safe, but not the implicit layout transition, which would happen before and therefore the swap-chain image
+        // might still being presented. To made this safe we added a dependency between External subpass and subpass 0 so:
+        // - Transition starts after external subpass (swap-chain) has finished reading from it.
+        // - Transition finishes before subpass 0 trying to read/write from it at VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage.
+        // 
+        // subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        // subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        // subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;  // Conversion has to start after: swap chain has read from it
+        // subpassDependencies[0].dstSubpass = 0;
+        // subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        // subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to finish before: reading or writing to color attachment
+        // subpassDependencies[0].dependencyFlags = 0;
+        // 
+        // -------------------------------
+        // Situation NOW with multiple subpasses is different, the swap-chain image is used in subpass 1, not 0:
+        // 
+        // The queue submit (vkQueueSubmit) will sync with the first VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage of the render pass,
+        // which will be found by the first subpass (subpass 0). So the swap-chain image will be ready before any operation (implicit layout
+        // transition or clear operation) is done in subpass 1. This means we don't need a subpass dependency now.
+        // 
+        // -------------------------------
+        // The transition from VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_PRESENT_SRC_KHR is the same now.
+        // It is handled implicitly and there is not issue with it, the swap-chain present is waiting for the semaphore that queue submit
+        // has finished execution everything, that includes writing to the swap-chain image AND do the transition to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR.
+        //
+        // -------------------------------
+        // Since subpass 1 uses as inputs the attachments from subpass 0, Vulkan guarantees that subpass 0 will be executed before subpass 1 starts.
+        // So no dependency is needed with regard to execution order.
+        // 
+        // But the change of layout that happens to the color/depth attachments from subpass 0 to subpass 1 is NOT implicitly handled by Vulkan and
+        // therefore we do need a subpass dependency for this:
+        // 
         // Layout in subpass 0 (color/depth attachment) -> Layout in subpass 1 (shader read)
         // Start after: Color Output stage in subpass 0
         // Finish before: Fragment shader stage in subpass 1
-        // 
-        // TODO: This might not be necessary because the color/depth images doesn't have any dependency
-        //       with previous executions or commands and therefore its layout transition can be done
-        //       automatically without having to specify a subpass dependency.
-        subpassDependencies[1].srcSubpass = 0;
-        subpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        subpassDependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to start after: writing to it
-        subpassDependencies[1].dstSubpass = 1;
-        subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT; // Conversion has to finish before: it has to be read from
-        subpassDependencies[1].dependencyFlags = 0;
-
-        // TODO: Missing Layout in subpass external (undefined) -> Layout in subpass 1 (swap-chain color attachment)
-        //       Otherwise the clear operation for swap-chain's image might happen before the image is available.
-
-        // Layout in subpass 1 (swap-chain color attachment) -> Layout in subpass external (present)
-        // Start after: Color Output stage in subpass 1
-        // Finish before: Whatever comes after tries to read from it
-        // 
-        // TODO: This might not be necessary because the present function is waiting with a semaphore that the
-        //       commands have finished and therefore the render pass have finished and the transition to present
-        //       layout would have happen implicitly.
-        subpassDependencies[2].srcSubpass = 1;
-        subpassDependencies[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        subpassDependencies[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to start after: reading or writing to it
-        subpassDependencies[2].dstSubpass = VK_SUBPASS_EXTERNAL;
-        subpassDependencies[2].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-        subpassDependencies[2].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT; // Conversion has to finish before: it has to be read from
-        subpassDependencies[2].dependencyFlags = 0;
+        subpassDependencies[0].srcSubpass = 0;
+        subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        subpassDependencies[0].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Conversion has to start after: writing to it
+        subpassDependencies[0].dstSubpass = 1;
+        subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        subpassDependencies[0].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT; // Conversion has to finish before: it has to be read from
+        subpassDependencies[0].dependencyFlags = 0;
 
         // -----------
         // Render Pass
@@ -274,18 +290,21 @@ namespace Vulkan
         // This is the render pass we're building:
         //
         // RENDER PASS
-        //      Color Attachment initial layout: VK_IMAGE_LAYOUT_UNDEFINED
-        //
-        //      Subpass dependency 1: Convert VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        // 
+        //      SUBPASS 0
+        //          Color Attachment initial layout transition: VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        //          Depth Attachment initial layout transition: VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        //          Draws to color/depth attachment
         // 
         //      SUBPASS 1
-        //          Color Attachment layout: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-        //          Draws to color attachment
+        //          Color Input layout transition (subpass dependency 0): VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        //          Depth Input layout transition (subpass dependency 0): VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        //          Swap-Chain Image Attachment initial layout transition: VK_IMAGE_LAYOUT_UNDEFINED -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        //          Draws to swap-chain image attachment
         //
-        //      Subpass dependency 2: Convert VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-        //
-        //      Color Attachment final layout: VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-        //      Present color attachment to surface
+        //      Color Attachment final layout conversion: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL -> VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        //      Depth Attachment final layout conversion: VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL -> VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        //      Swap Chain Image Attachment final layout conversion: VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL -> VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
         //
         VkRenderPassCreateInfo vkRenderPassCreateInfo = {};
         vkRenderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
