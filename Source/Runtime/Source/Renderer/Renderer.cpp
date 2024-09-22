@@ -157,6 +157,8 @@ namespace DX
         constexpr uint64_t noTimeOut = std::numeric_limits<uint64_t>::max();
 
         // 0) Wait for current frame's render fence to signal (be opened) from last draw before continuing.
+        // This is to know when the resources (command buffer, uniform buffers, descriptor sets) of this frame
+        // are available to be used.
         vkWaitForFences(m_device->GetVkDevice(), 1, &m_vkRenderFences[m_currentFrame], VK_TRUE, noTimeOut);
         // Reset (close) the fence, it means it's in use, then "vkQueueSubmit" later will mark it as open when finished.
         vkResetFences(m_device->GetVkDevice(), 1, &m_vkRenderFences[m_currentFrame]);
@@ -180,8 +182,11 @@ namespace DX
         RecordCommands(m_swapChain->GetFrameBuffer(swapChainImageIndex));
 
         // 3) Submit the command buffer (of the current image) to the queue for execution.
-        //    Wait at the convenient stage within the pipeline for the image semaphore to be signaled (so it's available for drawing to it).
-        //    For example, allow to execute vertex shader, but wait for the image semaphore to be available before executing fragment shader.
+        //    Wait at the convenient stage within the pipeline for the image semaphore to be signaled by vkAcquireNextImageKHR.
+        //    In this case we want to wait at VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT stage, where the clear and attachment write operations happen.
+        //    But there is an implicit operation that happens before that, the implicit layout transition specified in the
+        //    render pass from VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL. This will be handled by
+        //    a subpass dependency.
         //    Lastly signal (with a different semaphore) when it has finished rendering.
         const std::vector<VkPipelineStageFlags> waitStages = {
             VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
@@ -192,7 +197,7 @@ namespace DX
         vkSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         vkSubmitInfo.pNext = nullptr;
         vkSubmitInfo.pWaitDstStageMask = waitStages.data(); // Stages to check semaphores at. Execute until this stage, then wait on semaphores to be ready.
-        vkSubmitInfo.waitSemaphoreCount = 1; // Semaphores to wait on
+        vkSubmitInfo.waitSemaphoreCount = 1; // Semaphores to wait on. Each entry in pWaitDstStageMask corresponds to the semaphore with the same index in pWaitSemaphores.
         vkSubmitInfo.pWaitSemaphores = &m_vkImageAvailableSemaphores[m_currentFrame]; // Wait for GPU to signal m_vkImageAvailableSemaphore passed to vkAcquireNextImageKHR
         vkSubmitInfo.commandBufferCount = 1;
         vkSubmitInfo.pCommandBuffers = &currentCommandBuffer;
